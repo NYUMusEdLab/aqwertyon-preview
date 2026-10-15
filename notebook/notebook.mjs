@@ -1,9 +1,10 @@
 import './language.mjs';
+import {conversationChunks} from './conversation-chunks.mjs';
 import {createConversation} from './conversation.mjs';
 import * as TK from './takes.mjs';
 import {initDuet} from './duet.mjs';
 let app,recorder,replay,removed=null,replayId=null,previous=null,liveFrame=0,replayCounts=new Map(),generation=0;
-let renderedFirst=null;
+let renderedFirst=null,undoSession=null;
 let conversation,liveDuet=false,playingTake=null,conversationVoices=new Map();
 let replayKeys=new Map(),pitchKeys=new Map(),lastKey=null;
 const $=id=>document.getElementById(id);
@@ -18,19 +19,19 @@ function storage(){ $('melody-storage').textContent=TK.storageAvailable()?'Saved
 function render(){
  const host=$('melody-list'),active=document.activeElement;
  const editing=host.contains(active)&&active.matches('input')?{id:active.closest('article').dataset.id,value:active.value,start:active.selectionStart,end:active.selectionEnd}:null;
- host.replaceChildren();const list=TK.list(tool);if(list[0]?.id!==renderedFirst)host.scrollLeft=0;renderedFirst=list[0]?.id;$('melody-count').textContent=list.length;
+ host.replaceChildren();const list=TK.list(tool).flatMap(t=>conversationChunks(t));if(list[0]?.id!==renderedFirst)host.scrollLeft=0;renderedFirst=list[0]?.id;$('melody-count').textContent=list.length;
  $('melody-export').disabled=!list.length;$('melody-clear').disabled=!list.length;
  if(!list.length){const p=document.createElement('p');p.textContent='Play two or more notes over at least 0.8 seconds. After you release the keys and pause for 2.5 seconds, your melody appears here.';host.append(p);}
  for(const take of list){
   const card=document.createElement('article');card.className='melody-card';card.dataset.id=take.id;card.classList.toggle('video-take',!!take.media?.id);if(take.media?.id||take.kind==='conversation'){const badge=document.createElement('span');badge.className='take-badge';badge.textContent=take.kind==='conversation'?'You + AI conversation':'▶ Video';card.append(badge);}
-  const title=document.createElement('input');title.type='text';title.maxLength=200;title.value=take.title||'';title.placeholder='Untitled melody';title.setAttribute('aria-label','Melody name');title.addEventListener('change',()=>TK.rename(take.id,title.value.trim()));
-  const info=document.createElement('p');info.textContent=(take.origin==='ai'?'AI reply · ':'')+`${(take.duration/1000).toFixed(1)} s · ${take.cfg?.scaleSlug||'scale'} · ${take.cfg?.soundSlug?.replaceAll('_',' ')||'sound'}`;
+  const title=document.createElement('input');title.type='text';title.maxLength=200;title.value=take.title||'';title.placeholder='Untitled melody';title.setAttribute('aria-label','Melody name');title.addEventListener('change',()=>{if(take._sessions>1){const original=TK.get(take._parentId);original.sessionTitles={...original.sessionTitles,[take._offset]:title.value.trim()};TK.save(original);}else TK.rename(take._parentId||take.id,title.value.trim());});
+  const info=document.createElement('p');info.textContent=(take._sessions>1?'Session '+take._session+' · ':'')+(take.origin==='ai'?'AI reply · ':'')+`${(take.duration/1000).toFixed(1)} s · ${take.cfg?.scaleSlug||'scale'} · ${take.cfg?.soundSlug?.replaceAll('_',' ')||'sound'}`;
   const canvas=document.createElement('canvas');canvas.height=100;canvas.setAttribute('role','img');canvas.setAttribute('aria-label','Piano roll of '+(take.title||'untitled melody'));
   const controls=document.createElement('div');controls.className='melody-actions';
   const button=(text,fn)=>{const b=document.createElement('button');b.type='button';b.textContent=text;b.onclick=fn;controls.append(b);return b;};
   if(replayId===take.id)button('Stop',()=>stop());
   else {button(take.kind==='conversation'?'Replay conversation':'Replay melody',()=>play(take,false));if(take.media?.id)button('With video',()=>play(take,true));}
-  button('Delete',()=>{if(replayId===take.id)stop();removed=[take];$('melody-undo').textContent='Undo delete';TK.remove(take.id);$('melody-undo').hidden=false;});
+  button('Delete',()=>{if(replayId===take.id)stop();undoSession=null;const original=TK.get(take._parentId||take.id);removed=[original||take];$('melody-undo').textContent='Undo delete';if(take._sessions>1&&original){undoSession=original;const remaining={...original,events:original.events.filter(e=>e.t<take._offset||e.t>take._end)};TK.save(remaining);}else TK.remove(take._parentId||take.id);$('melody-undo').hidden=false;});
   card.append(title,info,canvas,controls);host.append(card);requestAnimationFrame(()=>TK.drawRoll(canvas,take.events,{pitches:pitches(take.events),labels:label,duration:take.duration,barFor:(m,b)=>b.voice==='ai'?'#c48527':b.voice==='human'?'#008f98':'#b4442c'}));
  }
  if(editing){const card=[...host.children].find(c=>c.dataset.id===editing.id),input=card?.querySelector('input');if(input){input.value=editing.value;input.focus({preventScroll:true});input.setSelectionRange(editing.start,editing.end);}}
@@ -143,8 +144,8 @@ function init(){
  $('melody-finish').onclick=()=>{app.releaseNotes();recorder.finish();};
  $('melody-export').onclick=()=>{const url=URL.createObjectURL(new Blob([TK.exportJSON(tool)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='aqwertyon-melodies.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
  $('melody-import').onchange=async e=>{try{const f=e.target.files[0];if(!f)return;if(f.size>5*1024*1024)throw new Error('Choose a JSON file smaller than 5 MB.');const n=TK.importJSON(await f.text());status(n+' melodies imported');}catch(error){status(error.message);}e.target.value='';};
- $('melody-clear').onclick=()=>{stop();const prior=TK.clearAll();if(prior.length){removed=prior;$('melody-undo').textContent='Undo clear all';$('melody-undo').hidden=false;status('Saved melodies cleared. Undo restores them during this visit.');}};
- $('melody-undo').onclick=()=>{if(removed){TK.restoreCleared(removed);removed=null;status('Saved melodies restored');}$('melody-undo').hidden=true;};
+ $('melody-clear').onclick=()=>{undoSession=null;stop();const prior=TK.clearAll();if(prior.length){removed=prior;$('melody-undo').textContent='Undo clear all';$('melody-undo').hidden=false;status('Saved melodies cleared. Undo restores them during this visit.');}};
+ $('melody-undo').onclick=()=>{if(undoSession){TK.save(undoSession);undoSession=null;removed=null;status('Saved session restored');}else if(removed){TK.restoreCleared(removed);removed=null;status('Saved melodies restored');}$('melody-undo').hidden=true;};
  section.addEventListener('toggle',()=>{if(section.open)render();else if(replayId)stop();});
  window.addEventListener('resize',render);render();
  $('melody-newer').onclick=()=>$('melody-list').scrollBy({left:-300,behavior:'smooth'});

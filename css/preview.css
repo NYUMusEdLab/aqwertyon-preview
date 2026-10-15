@@ -46,3 +46,5 @@ header #logo1{position:static;flex-shrink:0;height:50px;background-size:110px au
 @media(min-width:1100px) and (max-height:850px){.duet-panel #duet-roll{height:90px}.duet-panel>p:first-of-type{margin:3px 0}.duet-panel .duet-credit{line-height:1.2}.duet-controls{gap:5px}.duet-panel button{padding:6px 9px}}
 
 .videoBlk video{display:block;width:100%;max-height:260px;background:#111;aspect-ratio:16/9}.videoBlk .video-form[hidden]{display:none!important}
+
+.duet-choice{display:flex;flex-wrap:wrap;align-items:center;gap:6px}.duet-style-choice{flex-basis:100%}.duet-toggles{display:flex;flex-wrap:wrap;gap:4px}.duet-toggles button[aria-pressed="true"]{background:#165c63;color:#fff;border-color:#165c63;box-shadow:inset 0 -3px 0 #0a3439}.duet-toggles button[aria-pressed="false"]{background:#fff;color:#173b40;border:1px solid #78999d}.duet-toggles button:focus-visible{outline:3px solid #b65c15;outline-offset:2px}

@@ -28247,6 +28247,8 @@ var _slicedToArray = function () { function sliceIterator(arr, i) { var _arr = [
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
+var _get = function get(object, property, receiver) { if (object === null) object = Function.prototype; var desc = Object.getOwnPropertyDescriptor(object, property); if (desc === undefined) { var parent = Object.getPrototypeOf(object); if (parent === null) { return undefined; } else { return get(parent, property, receiver); } } else if ("value" in desc) { return desc.value; } else { var getter = desc.get; if (getter === undefined) { return undefined; } return getter.call(receiver); } };
+
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
@@ -28275,6 +28277,13 @@ var Score = require('./Score.js');
 
 var Aqwertyon = function (_MusED$AppBase) {
     _inherits(Aqwertyon, _MusED$AppBase);
+
+    _createClass(Aqwertyon, [{
+        key: 'isMobile',
+        get: function get() {
+            return _get(Aqwertyon.prototype.__proto__ || Object.getPrototypeOf(Aqwertyon.prototype), 'isMobile', this) || navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+        }
+    }]);
 
     function Aqwertyon(configManager) {
         _classCallCheck(this, Aqwertyon);
@@ -28590,7 +28599,7 @@ var Aqwertyon = function (_MusED$AppBase) {
             // TODO: Load this from an external file
             var layout = void 0;
             if (this.isMobile) {
-                layout = [['presetPicker'], ['video'], ['scalePicker', 'rootPicker', 'soundPicker', 'noteCaps'], ['keyboard']];
+                layout = [['presetPicker'], ['video'], ['scalePicker', 'rootPicker'], ['keyboard'], ['soundPicker', 'noteCaps']];
             } else {
                 layout = [['presetPicker'], ['video', 'score'], ['scalePicker', 'rootPicker'], ['volume', 'keyboard'], ['soundPicker', 'noteCaps']];
             }
@@ -29922,6 +29931,17 @@ Sounds.prototype = {
         }
     },
 
+    createBackingInstrument: function createBackingInstrument() {
+        var _this2 = this;
+
+        if (!this._backingPromise) this._backingPromise = Soundfont.instrument(Tone.context, 'acoustic_grand_piano', { soundfont: 'MusyngKite', nameToUrl: this.nameToUrl }).then(function (instrument) {
+            instrument.out.gain.value = 1;return instrument;
+        }).catch(function (error) {
+            _this2._backingPromise = null;throw error;
+        });
+        return this._backingPromise;
+    },
+
     noteOn: function noteOn(midiNote) {
         // Don't play any notes if we haven't loaded any instruments yet
         if (this._currInstrument === null) {
@@ -30098,8 +30118,11 @@ Keyboard.prototype = {
         window.addEventListener('blur', function () {
             return _this2.releaseAll();
         });
+        window.addEventListener('focus', function () {
+            if (_this2.keyboardContainer.contains(document.activeElement)) grid.activate();
+        });
         document.addEventListener('visibilitychange', function () {
-            if (document.hidden) _this2.releaseAll();
+            if (document.hidden) _this2.releaseAll();else if (_this2.keyboardContainer.contains(document.activeElement)) grid.activate();
         });
         window.addEventListener('pagehide', function () {
             return _this2.releaseAll();
@@ -30109,13 +30132,11 @@ Keyboard.prototype = {
         this.noteCapToggle = document.createElement('div');
         this.noteCapToggle.classList.add('optionMenu');
 
-        var label = document.createElement('label');label.textContent = 'Key labels';label.htmlFor = 'keyboard-labels';
+        var label = document.createElement('span');label.textContent = 'Key labels';label.id = 'keyboard-labels-heading';
         this.noteCapToggle.appendChild(label);
-        this._labelSelect = document.createElement('select');this._labelSelect.id = 'keyboard-labels';this._labelSelect.title = 'Jianpu: 1 is the selected root; dots above or below mark higher or lower octaves.';
-        this._labelSelect.innerHTML = '<option value="keys">Key Names</option><option value="western">Note Names</option><option value="jianpu">Jianpu</option>';
+        this._labelSelect = document.createElement('div');this._labelSelect.id = 'keyboard-labels';this._labelSelect.setAttribute('role', 'group');this._labelSelect.setAttribute('aria-labelledby', 'keyboard-labels-heading');this._labelSelect.title = 'Jianpu: 1 is the selected root; dots above or below mark higher or lower octaves.';
+        this._labelSelect.innerHTML = '<button type="button" data-label="keys" aria-pressed="false">Key Names</button><button type="button" data-label="western" aria-pressed="false">Note Names</button><button type="button" data-label="jianpu" aria-pressed="false">Jianpu</button>';
         this.noteCapToggle.appendChild(this._labelSelect);
-        // Return to playing only for pointer/touch choices. Keyboard navigation
-        // retains the native select's focus and Tab order.
         var pointerLabelChoice = false;
         this._labelSelect.addEventListener('pointerdown', function (e) {
             pointerLabelChoice = e.button === 0;
@@ -30126,19 +30147,15 @@ Keyboard.prototype = {
         this._labelSelect.addEventListener('pointercancel', function () {
             pointerLabelChoice = false;
         });
-        this._labelSelect.addEventListener('blur', function () {
-            pointerLabelChoice = false;
-        });
-        this._labelSelect.onchange = function () {
-            var returnToPlaying = pointerLabelChoice;pointerLabelChoice = false;
-            _this2.releaseAll();
-            _this2.labelMode = _this2._labelSelect.value;
+        this._labelSelect.addEventListener('click', function (e) {
+            var button = e.target.closest('button[data-label]');if (!button) return;
+            var returnToPlaying = pointerLabelChoice || e.detail > 0;pointerLabelChoice = false;
+            _this2.releaseAll();_this2.labelMode = button.dataset.label;
             _this2._parent.logUpdatedOption(['features', 'labelMode'], _this2.labelMode);
-            if (returnToPlaying) requestAnimationFrame(function () {
-                // A later Tab or click into another control takes precedence.
-                if (document.activeElement === _this2._labelSelect) _this2.keyboardContainer.focus({ preventScroll: true });
-            });
-        };
+            if (returnToPlaying) {
+                _this2.keyboardContainer.focus({ preventScroll: true });grid.activate();
+            }
+        });
 
         // Load Key Map
         var self = this;
@@ -30174,9 +30191,15 @@ Keyboard.prototype = {
         return this._labelMode || 'keys';
     },
     set labelMode(value) {
+        var _this3 = this;
+
         this._labelMode = ['keys', 'western', 'jianpu'].includes(value) ? value : 'keys';
         this._useCustomLabels = this._labelMode !== 'keys';
-        if (this._labelSelect) this._labelSelect.value = this._labelMode;
+        if (this._labelSelect) {
+            this._labelSelect.value = this._labelMode;this._labelSelect.querySelectorAll('button').forEach(function (b) {
+                return b.setAttribute('aria-pressed', String(b.dataset.label === _this3._labelMode));
+            });
+        }
         if (this._useCustomLabels) this.mapping.updateNoteLabels();else if (this._keyTemplate) this.buttons.applyTemplate(this._keyTemplate);
     },
 

@@ -27450,7 +27450,7 @@ module.exports={
         "midiRoot": 66,
         "videoSlug": "cmsd",
         "scaleSlug": "major-pentatonic",
-        "soundSlug": "acoustic_grand_piano",
+        "soundSlug": "flute",
         "scoreSlug": null,
         "features": {
           "layout": "1-3-5-8",
@@ -27526,7 +27526,7 @@ var AudioControls = function AudioControls(parent) {
         engineSlug: 'none',
         engineConfigs: {
             'classic': { soundSlug: 'bessie', class: ClassicSounds },
-            'soundfont': { soundSlug: 'rock_organ', class: SoundfontSounds },
+            'soundfont': { soundSlug: 'flute', class: SoundfontSounds },
             'none': { soundSlug: 'none', class: NullEngine }
         }
     };
@@ -27564,12 +27564,27 @@ AudioControls.prototype = {
             state.textContent = e.detail;
         });
 
+        var pointerSelection = false;
+        this._soundPickerMenu.addEventListener('pointerdown', function () {
+            pointerSelection = true;
+        });
+        this._soundPickerMenu.addEventListener('keydown', function () {
+            pointerSelection = false;
+        });
         this._soundPickerMenu.addEventListener('change', function (event) {
-            this.sounds.setInstrument(event.target.value);
+            var selected = event.target.value;
+            // End replay and restore its temporary settings before applying the user's choice.
+            document.dispatchEvent(new CustomEvent('aq:sound-selection'));
+            event.target.value = selected;
+            this.sounds.setInstrument(selected);
             this.config.engineConfigs[this.config.engineSlug].soundSlug = event.target.value;
 
             this.parent.sessionManager.logEvent('sound', event.target.value);
-            this.parent.logUpdatedOption('soundSlug', event.target.value);
+            this.parent.logUpdatedOption('soundSlug', selected);
+            if (pointerSelection) {
+                this.parent.keyboard.keyboardContainer.focus({ preventScroll: true });this.parent.keyboard.buttons.activate();
+            }
+            pointerSelection = false;
         }.bind(this));
     },
 
@@ -28198,7 +28213,7 @@ if (Aqwertyon.prototype.isLocal) {
 var sharedVideo = new URLSearchParams(location.search).get('video');
 var useCMSDDefault = !sharedVideo || sharedVideo === 'cmsd';
 var videoDefault = 'cmsd'; // Existing MusEDLab-hosted CMSD piano duet
-var soundDefault = audioEngineDefault == 'soundfont' ? useCMSDDefault ? 'acoustic_grand_piano' : 'rock_organ' : 'bessie';
+var soundDefault = audioEngineDefault == 'soundfont' ? useCMSDDefault ? 'flute' : 'rock_organ' : 'bessie';
 var rootDefault = audioEngineDefault == 'soundfont' ? useCMSDDefault ? 66 : 62 : 50; // F-sharp4 for CMSD; legacy D4 for explicit YouTube links
 var presetsDefault = window.self == window.top ? 'HJ8BqlWJb' : ''; // Ethan's landing page; don't use if embedded
 
@@ -29856,7 +29871,7 @@ var Sounds = function Sounds() {
 
     this.instruments = [];
 
-    this.defaultInstrument = 'acoustic_grand_piano';
+    this.defaultInstrument = 'flute';
 
     this._loadedInstruments = {};
     this._activeNotes = {};

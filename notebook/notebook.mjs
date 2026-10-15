@@ -12,8 +12,10 @@ function currentEvents(){const c=recorder.current();return c?c.events.concat([..
 function drawLive(){const events=currentEvents();TK.drawRoll($('melody-live'),events,{pitches:pitches(events),labels:label});if(recorder.active())liveFrame=requestAnimationFrame(drawLive);}
 function storage(){ $('melody-storage').textContent=TK.storageAvailable()?'Saved in this browser · newest 60 melodies · Export for a backup':'Browser storage unavailable · kept for this visit only · Export for a backup';}
 function render(){
- const host=$('melody-list');host.replaceChildren();const list=TK.list(tool);$('melody-count').textContent=list.length;
- $('melody-export').disabled=!list.length;
+ const host=$('melody-list'),active=document.activeElement;
+ const editing=host.contains(active)&&active.matches('input')?{id:active.closest('article').dataset.id,value:active.value,start:active.selectionStart,end:active.selectionEnd}:null;
+ host.replaceChildren();const list=TK.list(tool);$('melody-count').textContent=list.length;
+ $('melody-export').disabled=!list.length;$('melody-clear').disabled=!list.length;
  if(!list.length){const p=document.createElement('p');p.textContent='Play two or more notes over at least 0.8 seconds. After you release the keys and pause for 2.5 seconds, your melody appears here.';host.append(p);}
  for(const take of list){
   const card=document.createElement('article');card.className='melody-card';card.dataset.id=take.id;
@@ -24,9 +26,10 @@ function render(){
   const button=(text,fn)=>{const b=document.createElement('button');b.type='button';b.textContent=text;b.onclick=fn;controls.append(b);return b;};
   if(replayId===take.id)button('Stop',()=>stop());
   else {button('Replay melody',()=>play(take,false));if(take.media?.id)button('With video',()=>play(take,true));}
-  button('Delete',()=>{if(replayId===take.id)stop();removed=take;TK.remove(take.id);$('melody-undo').hidden=false;});
+  button('Delete',()=>{if(replayId===take.id)stop();removed=[take];$('melody-undo').textContent='Undo delete';TK.remove(take.id);$('melody-undo').hidden=false;});
   card.append(title,info,canvas,controls);host.append(card);requestAnimationFrame(()=>TK.drawRoll(canvas,take.events,{pitches:pitches(take.events),labels:label,duration:take.duration}));
  }
+ if(editing){const card=[...host.children].find(c=>c.dataset.id===editing.id),input=card?.querySelector('input');if(input){input.value=editing.value;input.focus({preventScroll:true});input.setSelectionRange(editing.start,editing.end);}}
  storage();
 }
 function chooseReplayKey(midi,code){
@@ -46,6 +49,7 @@ function replayLights(){
  for(const b of Object.values(app.keyboard.buttons._buttonsByName))b.classList.toggle('notebook-playing',active.has(b));
 }
 function stop(){
+ const keepFocus=$('keyboardContainer').contains(document.activeElement);
  generation++;replay.stop(true);replayCounts.clear();replayKeys.clear();pitchKeys.clear();lastKey=null;replayLights();replayId=null;
  if(previous){
   app.audioControls.switchSound(previous.sound,'soundfont');
@@ -55,9 +59,11 @@ function stop(){
   previous=null;
  }
  status('Ready for your next melody');render();document.dispatchEvent(new CustomEvent('aq:replay-stop'));
- $('keyboardContainer').focus({preventScroll:true});
+ if(keepFocus)$('keyboardContainer').focus({preventScroll:true});
 }
 async function play(take,withVideo){
+ const focusOnReplay=$('keyboardContainer').contains(document.activeElement)||!!document.activeElement.closest('.melody-actions');
+ app.audioControls.resume();
  document.dispatchEvent(new CustomEvent('aq:replay-start',{detail:{id:take.id}}));
  app.releaseNotes();recorder.finish('replay');stop();const run=++generation;
  replayId=take.id;status('Loading melody sound…');render();
@@ -86,27 +92,27 @@ async function play(take,withVideo){
  status(withVideo?'Replaying with the video':'Replaying melody');
  document.dispatchEvent(new CustomEvent('aq:replay-playing',{detail:take}));
  replay.play(take,{onTick(ms){document.dispatchEvent(new CustomEvent('aq:replay-tick',{detail:{id:take.id,ms}}));const c=[...$('melody-list').children].find(c=>c.dataset.id===take.id);if(c)TK.drawRoll(c.querySelector('canvas'),take.events,{pitches:pitches(take.events),labels:label,duration:take.duration,playhead:ms});},onEnd:()=>stop()});
- $('keyboardContainer').focus({preventScroll:true});
+ if(focusOnReplay)$('keyboardContainer').focus({preventScroll:true});
 }
 function init(){
  if(recorder)return;app=window.appInfo.app;if(!app?.keyboard.keyboardContainer)return;
  const section=document.createElement('details');section.id='melody-notebook';section.open=true;
- section.innerHTML='<summary>Melody Notebook <span id="melody-count">0</span></summary><div class="notebook-body"><p id="melody-status" role="status">Ready for your next melody</p><canvas id="melody-live" height="65" aria-label="Current melody piano roll" role="img"></canvas><p id="melody-storage"></p><p class="melody-note">Captures your played notes and timing, not microphone or video audio. Settings links do not include your melodies.</p><div class="melody-actions"><button id="melody-finish" type="button">Save phrase now</button><button id="melody-export" type="button">Export melodies</button><label class="import-label">Import melodies<input id="melody-import" type="file" accept=".json,application/json"></label><button id="melody-undo" type="button" hidden>Undo delete</button></div><div id="melody-list"></div></div>';
+ section.innerHTML='<summary>Melody Notebook <span id="melody-count">0</span></summary><div class="notebook-body"><p id="melody-status" role="status">Ready for your next melody</p><canvas id="melody-live" height="65" aria-label="Current melody piano roll" role="img"></canvas><p id="melody-storage"></p><p class="melody-note">Captures your played notes and timing, not microphone or video audio. Settings links do not include your melodies.</p><div class="melody-actions"><button id="melody-finish" type="button">Save phrase now</button><button id="melody-export" type="button">Export melodies</button><label class="import-label">Import melodies<input id="melody-import" type="file" accept=".json,application/json"></label><button id="melody-clear" type="button">Clear all</button><button id="melody-undo" type="button" hidden>Undo delete</button></div><div id="melody-list"></div></div>';
  document.getElementById('main').after(section);$('keyboardContainer').tabIndex=0;
  recorder=TK.createRecorder({tool,cfg,media:()=>app.video.ready&&app.video.player.getPlayerState()===1?{id:app.video.videoSlug,offset:app.video.player.getCurrentTime()}:null,onStart(){status('Capturing your melody…');cancelAnimationFrame(liveFrame);drawLive();},onEnd(t,reason){cancelAnimationFrame(liveFrame);status(t?'Melody saved':'Play a little longer to keep a melody');render();if(t&&(reason==='gap'||reason==='manual'))document.dispatchEvent(new CustomEvent('aq:phrase',{detail:t}));}});
  replay=TK.createPlayer({noteOn(midi,code){const key=chooseReplayKey(midi,code);if(key)replayKeys.set(code||String(midi),key);const n=replayCounts.get(midi)||0;if(!n)app.audioControls.noteOn(midi);replayCounts.set(midi,n+1);replayLights();},noteOff(midi,code){replayKeys.delete(code||String(midi));const n=Math.max(0,(replayCounts.get(midi)||0)-1);replayCounts.set(midi,n);if(!n)app.audioControls.noteOff(midi);replayLights();}});
  document.addEventListener('aq:note',e=>{if(replayId){if(e.detail.type==='on')stop();return;}const d=e.detail;d.type==='on'?recorder.noteOn(d.midi,d.code):recorder.noteOff(d.midi,d.code);});
  document.addEventListener('aq:configuration',()=>{app.releaseNotes();recorder.finish();if(replayId)stop();});
  document.addEventListener('aq:takes',render);
- document.addEventListener('focusin',e=>{if(e.target.matches('input,textarea,select')){app.releaseNotes();app.keyboard.buttons.deactivate('');}});
- document.addEventListener('focusout',e=>{if(e.target.matches('input,textarea,select'))app.keyboard.buttons.activate();});
+ document.addEventListener('focusin',e=>{if(e.target.matches('input,textarea,select')||e.target.isContentEditable)app.releaseNotes();});
  window.addEventListener('blur',()=>{app.releaseNotes();recorder.finish();});
  document.addEventListener('visibilitychange',()=>{if(document.hidden){app.releaseNotes();recorder.finish();if(replayId)stop();}});
  window.addEventListener('pagehide',()=>{app.releaseNotes();recorder.finish();});
  $('melody-finish').onclick=()=>{app.releaseNotes();recorder.finish();};
  $('melody-export').onclick=()=>{const url=URL.createObjectURL(new Blob([TK.exportJSON(tool)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='aqwertyon-melodies.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
  $('melody-import').onchange=async e=>{try{const f=e.target.files[0];if(!f)return;if(f.size>5*1024*1024)throw new Error('Choose a JSON file smaller than 5 MB.');const n=TK.importJSON(await f.text());status(n+' melodies imported');}catch(error){status(error.message);}e.target.value='';};
- $('melody-undo').onclick=()=>{if(removed){TK.save(removed);removed=null;}$('melody-undo').hidden=true;};
+ $('melody-clear').onclick=()=>{stop();const prior=TK.clearAll();if(prior.length){removed=prior;$('melody-undo').textContent='Undo clear all';$('melody-undo').hidden=false;status('Saved melodies cleared. Undo restores them during this visit.');}};
+ $('melody-undo').onclick=()=>{if(removed){TK.restoreCleared(removed);removed=null;}$('melody-undo').hidden=true;};
  section.addEventListener('toggle',()=>{if(section.open)render();else if(replayId)stop();});
  window.addEventListener('resize',render);render();
  window.aqNotebook={recorder,replay,play,stop,TK};initDuet(app);

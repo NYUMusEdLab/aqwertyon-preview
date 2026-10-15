@@ -3326,197 +3326,6 @@ module.exports=[
 ]
 
 },{}],20:[function(require,module,exports){
-/**
- *  StartAudioContext.js
- *  @author Yotam Mann
- *  @license http://opensource.org/licenses/MIT MIT License
- *  @copyright 2016 Yotam Mann
- */
-(function (root, factory) {
-	if (typeof define === "function" && define.amd) {
-		define([], factory)
-	 } else if (typeof module === "object" && module.exports) {
-        module.exports = factory()
-	} else {
-		root.StartAudioContext = factory()
-  }
-}(this, function () {
-
-	//TAP LISTENER/////////////////////////////////////////////////////////////
-
-	/**
-	 * @class  Listens for non-dragging tap ends on the given element
-	 * @param {Element} element
-	 * @internal
-	 */
-	var TapListener = function(element, context){
-
-		this._dragged = false
-
-		this._element = element
-
-		this._bindedMove = this._moved.bind(this)
-		this._bindedEnd = this._ended.bind(this, context)
-
-		element.addEventListener("touchstart", this._bindedEnd)
-		element.addEventListener("touchmove", this._bindedMove)
-		element.addEventListener("touchend", this._bindedEnd)
-		element.addEventListener("mouseup", this._bindedEnd)
-	}
-
-	/**
-	 * drag move event
-	 */
-	TapListener.prototype._moved = function(e){
-		this._dragged = true
-	};
-
-	/**
-	 * tap ended listener
-	 */
-	TapListener.prototype._ended = function(context){
-		if (!this._dragged){
-			startContext(context)
-		}
-		this._dragged = false
-	};
-
-	/**
-	 * remove all the bound events
-	 */
-	TapListener.prototype.dispose = function(){
-		this._element.removeEventListener("touchstart", this._bindedEnd)
-		this._element.removeEventListener("touchmove", this._bindedMove)
-		this._element.removeEventListener("touchend", this._bindedEnd)
-		this._element.removeEventListener("mouseup", this._bindedEnd)
-		this._bindedMove = null
-		this._bindedEnd = null
-		this._element = null
-	};
-
-	//END TAP LISTENER/////////////////////////////////////////////////////////
-
-	/**
-	 * Plays a silent sound and also invoke the "resume" method
-	 * @param {AudioContext} context
-	 * @private
-	 */
-	function startContext(context){
-		// this accomplishes the iOS specific requirement
-		var buffer = context.createBuffer(1, 1, context.sampleRate)
-		var source = context.createBufferSource()
-		source.buffer = buffer
-		source.connect(context.destination)
-		source.start(0)
-
-		// resume the audio context
-		if (context.resume){
-			context.resume()
-		}
-	}
-
-	/**
-	 * Returns true if the audio context is started
-	 * @param  {AudioContext}  context
-	 * @return {Boolean}
-	 * @private
-	 */
-	function isStarted(context){
-		 return context.state === "running"
-	}
-
-	/**
-	 * Invokes the callback as soon as the AudioContext
-	 * is started
-	 * @param  {AudioContext}   context
-	 * @param  {Function} callback
-	 */
-	function onStarted(context, callback){
-
-		function checkLoop(){
-			if (isStarted(context)){
-				callback()
-			} else {
-				requestAnimationFrame(checkLoop)
-				if (context.resume){
-					context.resume()
-				}
-			}
-		}
-
-		if (isStarted(context)){
-			callback()
-		} else {
-			checkLoop()
-		}
-	}
-
-	/**
-	 * Add a tap listener to the audio context
-	 * @param  {Array|Element|String|jQuery} element
-	 * @param {Array} tapListeners
-	 */
-	function bindTapListener(element, tapListeners, context){
-		if (Array.isArray(element) || (NodeList && element instanceof NodeList)){
-			for (var i = 0; i < element.length; i++){
-				bindTapListener(element[i], tapListeners, context)
-			}
-		} else if (typeof element === "string"){
-			bindTapListener(document.querySelectorAll(element), tapListeners, context)
-		} else if (element.jquery && typeof element.toArray === "function"){
-			bindTapListener(element.toArray(), tapListeners, context)
-		} else if (Element && element instanceof Element){
-			//if it's an element, create a TapListener
-			var tap = new TapListener(element, context)
-			tapListeners.push(tap)
-		} 
-	}
-
-	/**
-	 * @param {AudioContext} context The AudioContext to start.
-	 * @param {Array|String|Element|jQuery=} elements For iOS, the list of elements
-	 *                                               to bind tap event listeners
-	 *                                               which will start the AudioContext. If
-	 *                                               no elements are given, it will bind
-	 *                                               to the document.body.
-	 * @param {Function=} callback The callback to invoke when the AudioContext is started.
-	 * @return {Promise} The promise is invoked when the AudioContext
-	 *                       is started.
-	 */
-	function StartAudioContext(context, elements, callback){
-
-		//the promise is invoked when the AudioContext is started
-		var promise = new Promise(function(success) {
-			onStarted(context, success)
-		})
-
-		// The TapListeners bound to the elements
-		var tapListeners = []
-
-		// add all the tap listeners
-		if (!elements){
-			elements = document.body
-		}
-		bindTapListener(elements, tapListeners, context)
-
-		//dispose all these tap listeners when the context is started
-		promise.then(function(){
-			for (var i = 0; i < tapListeners.length; i++){
-				tapListeners[i].dispose()
-			}
-			tapListeners = null
-
-			if (callback){
-				callback()
-			}
-		})
-
-		return promise
-	}
-
-	return StartAudioContext
-}))
-},{}],21:[function(require,module,exports){
 (function(root, factory){
 
 	//UMD
@@ -25435,7 +25244,7 @@ module.exports=[
 	
 	return Tone;
 }));
-},{}],22:[function(require,module,exports){
+},{}],21:[function(require,module,exports){
 'use strict';
 
 var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
@@ -25527,7 +25336,7 @@ var AppBase = function () {
 
 module.exports = AppBase;
 
-},{"./Util":24}],23:[function(require,module,exports){
+},{"./Util":23}],22:[function(require,module,exports){
 'use strict';
 
 var DeviceSupport = function DeviceSupport() {};
@@ -25669,7 +25478,7 @@ DeviceSupport.prototype = {
 
 module.exports = new DeviceSupport();
 
-},{}],24:[function(require,module,exports){
+},{}],23:[function(require,module,exports){
 'use strict';
 
 var Util = {
@@ -25788,7 +25597,7 @@ var Util = {
 
 module.exports = Util;
 
-},{}],25:[function(require,module,exports){
+},{}],24:[function(require,module,exports){
 'use strict';
 
 var Analytics = function Analytics() {};
@@ -25841,7 +25650,7 @@ Analytics.prototype = {
 
 module.exports = new Analytics();
 
-},{}],26:[function(require,module,exports){
+},{}],25:[function(require,module,exports){
 'use strict';
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
@@ -26062,7 +25871,7 @@ var ConfigManager = function () {
 
 module.exports = new ConfigManager(); // SINGLETON
 
-},{}],27:[function(require,module,exports){
+},{}],26:[function(require,module,exports){
 'use strict';
 
 var AppBase = require('./AppBase');
@@ -26095,12 +25904,12 @@ var MusEDCore = {
 
 module.exports = MusEDCore;
 
-},{"./AppBase":22,"./DeviceSupport":23,"./Util":24,"./internal/Analytics":25,"./internal/ConfigManager":26}],28:[function(require,module,exports){
+},{"./AppBase":21,"./DeviceSupport":22,"./Util":23,"./internal/Analytics":24,"./internal/ConfigManager":25}],27:[function(require,module,exports){
 'use strict';
 
 module.exports = require('./js/ButtonGrid');
 
-},{"./js/ButtonGrid":30}],29:[function(require,module,exports){
+},{"./js/ButtonGrid":29}],28:[function(require,module,exports){
 'use strict';
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
@@ -26469,7 +26278,7 @@ Button._keyCount = 0;
 
 module.exports = Button;
 
-},{}],30:[function(require,module,exports){
+},{}],29:[function(require,module,exports){
 (function (Buffer){(function (){
 'use strict';
 
@@ -27120,12 +26929,12 @@ function addCodeToKeyEvent(event) {
 module.exports = ButtonGrid;
 
 }).call(this)}).call(this,require("buffer").Buffer)
-},{"./Button":29,"buffer":6}],31:[function(require,module,exports){
+},{"./Button":28,"buffer":6}],30:[function(require,module,exports){
 'use strict';
 
 module.exports = require('./js/NotePicker');
 
-},{"./js/NotePicker":32}],32:[function(require,module,exports){
+},{"./js/NotePicker":31}],31:[function(require,module,exports){
 'use strict';
 
 var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
@@ -27628,7 +27437,7 @@ function parseKeyboardLength(keyboardLength) {
 
 module.exports = NotePicker;
 
-},{"../../button-grid/js/ButtonGrid":30}],33:[function(require,module,exports){
+},{"../../button-grid/js/ButtonGrid":29}],32:[function(require,module,exports){
 module.exports={
   "title": "aQWERTYon Tasting Menu",
   "sequence": [
@@ -27942,13 +27751,14 @@ module.exports={
   ]
 }
 
-},{}],34:[function(require,module,exports){
+},{}],33:[function(require,module,exports){
 'use strict';
 
 // Import different audio engines we might want to support
 var ClassicSounds = require('./audio/classic/sounds.js');
 var SoundfontSounds = require('./audio/soundfont/sounds.js');
 var Util = require('./util.js');
+var Tone = require('tone');
 
 var NullEngine = function NullEngine() {
     this.instruments = [{ slug: 'none', name: 'None' }];
@@ -28051,7 +27861,12 @@ AudioControls.prototype = {
         }.bind(this));
     },
 
+    resume: function resume() {
+        if (Tone.context.state === 'suspended') Tone.context.resume();
+    },
+
     noteOn: function noteOn(midiNote) {
+        this.resume();
         this.sounds.noteOn(midiNote);
     },
 
@@ -28122,7 +27937,7 @@ Object.defineProperty(AudioControls.prototype, 'volume', {
 
 module.exports = AudioControls;
 
-},{"./audio/classic/sounds.js":41,"./audio/soundfont/sounds.js":43,"./util.js":53}],35:[function(require,module,exports){
+},{"./audio/classic/sounds.js":40,"./audio/soundfont/sounds.js":42,"./util.js":52,"tone":20}],34:[function(require,module,exports){
 'use strict';
 
 var migrate = require('./configurationMigrator');
@@ -28179,7 +27994,7 @@ PresetPicker.prototype.toggleVisibility = function (show) {
 };
 module.exports = PresetPicker;
 
-},{"../data/presets.json":33,"./configurationMigrator":44}],36:[function(require,module,exports){
+},{"../data/presets.json":32,"./configurationMigrator":43}],35:[function(require,module,exports){
 'use strict';
 
 var Theory = require('./controller/theory.js');
@@ -28349,7 +28164,7 @@ ScalePicker.prototype = {
 
 module.exports = ScalePicker;
 
-},{"./controller/theory.js":48}],37:[function(require,module,exports){
+},{"./controller/theory.js":47}],36:[function(require,module,exports){
 'use strict';
 
 /**
@@ -28400,7 +28215,7 @@ Score.prototype = {
 
 module.exports = Score;
 
-},{}],38:[function(require,module,exports){
+},{}],37:[function(require,module,exports){
 'use strict';
 
 function parseVideo(value) {
@@ -28453,6 +28268,9 @@ Video.prototype.init = function () {
   this.status = document.createElement('p');this.status.className = 'video-status';this.status.setAttribute('role', 'status');this.container.appendChild(this.status);
   this.mount = document.createElement('div');this.mount.id = 'aq-youtube-player';this.container.appendChild(this.mount);
   this.watch = document.createElement('a');this.watch.textContent = 'Open on YouTube ↗';this.watch.target = '_blank';this.watch.rel = 'noopener';this.container.appendChild(this.watch);
+  var returnKey = document.createElement('button');returnKey.type = 'button';returnKey.className = 'return-keyboard';returnKey.textContent = 'Return to keyboard';returnKey.addEventListener('click', function () {
+    return _this.parent.keyboard.keyboardContainer.focus({ preventScroll: true });
+  });this.container.appendChild(returnKey);
   form.addEventListener('submit', function (e) {
     e.preventDefault();var parsed = parseVideo(_this._videoURL.value || _this._videoSlug);if (!parsed) {
       _this.status.textContent = 'Enter a valid YouTube link or 11-character video ID.';return;
@@ -28530,7 +28348,7 @@ Object.defineProperties(Video.prototype, {
 Video.prototype.resize = function () {};
 module.exports = Video;
 
-},{}],39:[function(require,module,exports){
+},{}],38:[function(require,module,exports){
 'use strict';
 
 var Aqwertyon = require('./aqwertyon.js');
@@ -28597,6 +28415,7 @@ window.appInfo = {
                     allControls: { type: 'bool', inTemplate: true, urlParam: 'controls', inUI: false, default: true },
                     scaleControls: { type: 'bool', inTemplate: true, urlParam: 'scale-controls', inUI: false, default: true },
                     layout: { type: 'string', inTemplate: true, urlParam: 'layout', inUI: false, default: '1-3-5-8' },
+                    labelMode: { type: 'string', inTemplate: true, urlParam: 'labels', inUI: true, default: '' },
                     useNoteCaps: { type: 'bool', inTemplate: true, urlParam: 'notecaps', inUI: true, default: true },
                     override: { type: 'bool', inTemplate: false, urlParam: 'override', inUI: false, default: false }
                 }
@@ -28606,7 +28425,7 @@ window.appInfo = {
     }
 };
 
-},{"./aqwertyon.js":40,"./configurationMigrator.js":44}],40:[function(require,module,exports){
+},{"./aqwertyon.js":39,"./configurationMigrator.js":43}],39:[function(require,module,exports){
 'use strict';
 
 var _slicedToArray = function () { function sliceIterator(arr, i) { var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"]) _i["return"](); } finally { if (_d) throw _e; } } return _arr; } return function (arr, i) { if (Array.isArray(arr)) { return arr; } else if (Symbol.iterator in Object(arr)) { return sliceIterator(arr, i); } else { throw new TypeError("Invalid attempt to destructure non-iterable instance"); } }; }();
@@ -28622,7 +28441,6 @@ function _inherits(subClass, superClass) { if (typeof superClass !== "function" 
 // External dependencies
 var MusED = require('mused-app-core');
 var Tone = require('tone');
-var StartAudioContext = require('startaudiocontext');
 
 // General infrastructure modules
 var SessionManager = require('./sessionManager.js');
@@ -28679,8 +28497,6 @@ var Aqwertyon = function (_MusED$AppBase) {
     _createClass(Aqwertyon, [{
         key: 'init',
         value: function init() {
-            var _this2 = this;
-
             MIDI.init();
 
             if (this.isMobile) {
@@ -28693,15 +28509,6 @@ var Aqwertyon = function (_MusED$AppBase) {
                 document.getElementById('main').before(note);
             }
             // Preview sessions and melodies stay local; never create or overwrite legacy CMS records.
-            window.addEventListener('keydown', function (e) {
-                if (e.key === 'Tab' || e.target.closest && e.target.closest('input,textarea,select,button,a,summary,[role="button"]')) e.stopImmediatePropagation();
-            }, true);
-            window.addEventListener('blur', function () {
-                _this2.keyboard.buttons.deactivate('Click the keyboard to play');_this2.releaseNotes();
-            });
-            window.addEventListener('focus', function () {
-                return _this2.keyboard.buttons.activate();
-            });
             this.sessionManager.offline = true;
             this.sessionManager.logEvent = function () {};
             this.sessionManager.saveOption = function () {};
@@ -28717,15 +28524,6 @@ var Aqwertyon = function (_MusED$AppBase) {
             }
 
             this.keyboard.init().then(function () {
-                // Require audio context start on mobile
-                if (self.isMobile) {
-                    console.log(self.keyboard);
-                    self.keyboard.buttons.deactivate('Tap to Start');
-                    StartAudioContext(Tone.context, document.body, function () {
-                        this.keyboard.buttons.activate();
-                    }.bind(self));
-                }
-
                 // Old-style setup functions
                 //self.setupTakesMenu();
 
@@ -28755,18 +28553,9 @@ var Aqwertyon = function (_MusED$AppBase) {
 
                 window.addEventListener('resize', self.resize.bind(self));
 
-                if (self.isEmbedded) {
-                    self.keyboard.buttons.deactivate('click to play');
-                }
-
                 self.layout();
                 self.reconfigure();
                 document.dispatchEvent(new CustomEvent('aq:ready'));
-                var resume = function resume() {
-                    if (Tone.context.state === 'suspended') Tone.context.resume();
-                };
-                document.addEventListener('pointerdown', resume);
-                document.addEventListener('keydown', resume);
                 self.updateShare();
             });
         }
@@ -28828,14 +28617,14 @@ var Aqwertyon = function (_MusED$AppBase) {
     }, {
         key: 'releaseNotes',
         value: function releaseNotes() {
-            var _this3 = this;
+            var _this2 = this;
 
             if (this._held) Array.from(this._held).forEach(function (_ref) {
                 var _ref2 = _slicedToArray(_ref, 2),
                     code = _ref2[0],
                     midi = _ref2[1];
 
-                return _this3.noteOff(midi, code);
+                return _this2.noteOff(midi, code);
             });
         }
     }, {
@@ -29060,7 +28849,7 @@ var Aqwertyon = function (_MusED$AppBase) {
     }, {
         key: 'reconfigure',
         value: function reconfigure() {
-            var _this4 = this;
+            var _this3 = this;
 
             var features = this.options.features;
 
@@ -29072,7 +28861,7 @@ var Aqwertyon = function (_MusED$AppBase) {
 
             // LAYOUT & LABELS
             this.keyboard.mapping.layout = features.layout;
-            this.keyboard.useCustomLabels = features.useNoteCaps;
+            this.keyboard.labelMode = features.labelMode || (features.useNoteCaps ? 'western' : 'keys');
 
             // SOUND
             this.audioControls.switchSound(this.options.soundSlug, features.audioEngine);
@@ -29091,10 +28880,10 @@ var Aqwertyon = function (_MusED$AppBase) {
 
             // Share the selected musical configuration, not just its sound/video.
             ['midiRoot', 'scaleSlug', 'soundSlug', 'videoSlug', 'volume'].forEach(function (k) {
-                return _this4.logUpdatedOption(k, _this4.options[k]);
+                return _this3.logUpdatedOption(k, _this3.options[k]);
             });
-            ['layout', 'useNoteCaps'].forEach(function (k) {
-                return _this4.logUpdatedOption(['features', k], features[k]);
+            ['layout', 'useNoteCaps', 'labelMode'].forEach(function (k) {
+                return _this3.logUpdatedOption(['features', k], features[k]);
             });
 
             // FEATURE REGIONS
@@ -29203,7 +28992,7 @@ var Aqwertyon = function (_MusED$AppBase) {
 
 module.exports = Aqwertyon;
 
-},{"./AudioControls.js":34,"./PresetPicker.js":35,"./ScalePicker.js":36,"./Score.js":37,"./Video.js":38,"./controller/Keyboard":45,"./controller/RootPicker":46,"./makemidi.js":49,"./sessionManager.js":51,"./timing.js":52,"mused-app-core":27,"startaudiocontext":20,"tone":21}],41:[function(require,module,exports){
+},{"./AudioControls.js":33,"./PresetPicker.js":34,"./ScalePicker.js":35,"./Score.js":36,"./Video.js":37,"./controller/Keyboard":44,"./controller/RootPicker":45,"./makemidi.js":48,"./sessionManager.js":50,"./timing.js":51,"mused-app-core":26,"tone":20}],40:[function(require,module,exports){
 'use strict';
 
 var Tone = require('tone');
@@ -29440,7 +29229,7 @@ Sounds.prototype = {
 
 module.exports = Sounds;
 
-},{"./synthPresets.js":42,"tone":21}],42:[function(require,module,exports){
+},{"./synthPresets.js":41,"tone":20}],41:[function(require,module,exports){
 "use strict";
 
 /**
@@ -30209,7 +29998,7 @@ module.exports = {
   'brass-slow': BrassSlow
 };
 
-},{}],43:[function(require,module,exports){
+},{}],42:[function(require,module,exports){
 'use strict';
 
 var Tone = require('tone');
@@ -30341,7 +30130,7 @@ Sounds.prototype = {
 
 module.exports = Sounds;
 
-},{"soundfont-player":17,"soundfont-player/names/musyngkite.json":19,"tone":21}],44:[function(require,module,exports){
+},{"soundfont-player":17,"soundfont-player/names/musyngkite.json":19,"tone":20}],43:[function(require,module,exports){
 "use strict";
 
 // Accept both historical preset schemas without mutating their source records.
@@ -30358,22 +30147,60 @@ function migrateConfig(version, input) {
 }
 module.exports = migrateConfig;
 
-},{}],45:[function(require,module,exports){
+},{}],44:[function(require,module,exports){
 'use strict';
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _get = function get(object, property, receiver) { if (object === null) object = Function.prototype; var desc = Object.getOwnPropertyDescriptor(object, property); if (desc === undefined) { var parent = Object.getPrototypeOf(object); if (parent === null) { return undefined; } else { return get(parent, property, receiver); } } else if ("value" in desc) { return desc.value; } else { var getter = desc.get; if (getter === undefined) { return undefined; } return getter.call(receiver); } };
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
 
 var Util = require('mused-app-core/js/Util');
 var KeyMapper = require('./keyMapper');
 var ButtonGrid = require('mused-ui/widget/button-grid');
+
+var InstrumentGrid = function (_ButtonGrid) {
+    _inherits(InstrumentGrid, _ButtonGrid);
+
+    function InstrumentGrid() {
+        _classCallCheck(this, InstrumentGrid);
+
+        return _possibleConstructorReturn(this, (InstrumentGrid.__proto__ || Object.getPrototypeOf(InstrumentGrid)).apply(this, arguments));
+    }
+
+    _createClass(InstrumentGrid, [{
+        key: '_keyPressed',
+        value: function _keyPressed(event) {
+            var region = this.domNode.parentElement;
+            if (!region || !region.contains(document.activeElement) || event.key === 'Tab' || event.isComposing || event.target.isContentEditable || event.target.closest && event.target.closest('input,textarea,select,button,a,summary,[role="button"]')) return;
+            _get(InstrumentGrid.prototype.__proto__ || Object.getPrototypeOf(InstrumentGrid.prototype), '_keyPressed', this).call(this, event);
+        }
+    }, {
+        key: 'deactivate',
+        value: function deactivate() {
+            _get(InstrumentGrid.prototype.__proto__ || Object.getPrototypeOf(InstrumentGrid.prototype), 'deactivate', this).call(this);this._overlay.classList.add('hidden');
+        }
+    }]);
+
+    return InstrumentGrid;
+}(ButtonGrid);
 
 /**
 The Keyboard wraps around the keyboard component and controls the way that its
 keys are mapped, as well as cleaning up its output into a well-formed stream of
 midi note on and off events.
 */
+
+
 var Keyboard = function Keyboard(parent) {
     // Main references to other classes
     this._parent = parent;
-    this.buttons = new ButtonGrid();
+    this.buttons = new InstrumentGrid();
     this.mapping = new KeyMapper(this);
 
     // Publicly-available properties
@@ -30396,9 +30223,17 @@ var Keyboard = function Keyboard(parent) {
 
 Keyboard.prototype = {
     init: function init() {
+        var _this2 = this;
+
         // Set up the keyboard container
         this.keyboardContainer = document.createElement('div');
         this.keyboardContainer.id = 'keyboardContainer';
+        this.keyboardContainer.tabIndex = 0;
+        this.keyboardContainer.setAttribute('role', 'group');
+        this.keyboardContainer.setAttribute('aria-label', 'Musical keyboard');
+        this.keyboardContainer.setAttribute('aria-description', 'Click or tap a key to play. When this keyboard has focus, use the letter keys to play. Tab moves to the next control.');
+        this.buttons.domNode.tabIndex = -1;
+        this.buttons._overlay.remove();
         this.keyboardContainer.appendChild(this.buttons.domNode);
         // Pointer capture supports independent fingers and releases on cancellation.
         var grid = this.buttons,
@@ -30417,7 +30252,7 @@ Keyboard.prototype = {
             if (e.button !== 0) return;
             // A pointer gesture must also dismiss the focus/mobile overlay.
             // Preventing the compatibility mousedown means it cannot do this for us.
-            node.focus({ preventScroll: true });
+            _this2.keyboardContainer.focus({ preventScroll: true });
             grid.activate();
             var hit = document.elementFromPoint(e.clientX, e.clientY);
             var target = hit && hit.closest('.mused-button');
@@ -30434,37 +30269,39 @@ Keyboard.prototype = {
         ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function (type) {
             return node.addEventListener(type, end);
         });
-        window.addEventListener('blur', function () {
+        this.releaseAll = function () {
             heldPointers.forEach(function (b, id) {
                 return b.release('pointer-' + id);
-            });heldPointers.clear();
+            });heldPointers.clear();grid.deactivate();_this2._parent.releaseNotes();
+        };
+        this.keyboardContainer.addEventListener('focusin', function () {
+            return grid.activate();
+        });
+        this.keyboardContainer.addEventListener('focusout', function (e) {
+            if (!_this2.keyboardContainer.contains(e.relatedTarget)) _this2.releaseAll();
+        });
+        window.addEventListener('blur', function () {
+            return _this2.releaseAll();
+        });
+        document.addEventListener('visibilitychange', function () {
+            if (document.hidden) _this2.releaseAll();
+        });
+        window.addEventListener('pagehide', function () {
+            return _this2.releaseAll();
         });
 
         // Set up the note cap button
         this.noteCapToggle = document.createElement('div');
         this.noteCapToggle.classList.add('optionMenu');
 
-        // Add label
-        var label = document.createElement('label');
-        label.textContent = 'Note Caps';
+        var label = document.createElement('label');label.textContent = 'Key labels';label.htmlFor = 'keyboard-labels';
         this.noteCapToggle.appendChild(label);
-
-        // Add button
-        this._noteCapToggleButton = nx.add('toggle', {
-            w: 32,
-            h: 32,
-            name: 'noteCapsToggle'
-        });
-        this.noteCapToggle.appendChild(this._noteCapToggleButton.canvas);
-
-        this._noteCapToggleButton.on("*", function (data) {
-            var isUse = data.value == 1;
-
-            this.useCustomLabels = isUse;
-
-            self._parent.logUpdatedOption(['features', 'useNoteCaps'], isUse);
-            ga('send', 'event', 'noteCaps', 'set', isUse ? 'on' : 'off');
-        }.bind(this));
+        this._labelSelect = document.createElement('select');this._labelSelect.id = 'keyboard-labels';this._labelSelect.title = 'Jianpu: 1 is the selected root; dots above or below mark higher or lower octaves.';
+        this._labelSelect.innerHTML = '<option value="keys">Keyboard keys</option><option value="western">Western notes</option><option value="jianpu">Jianpu</option>';
+        this.noteCapToggle.appendChild(this._labelSelect);
+        this._labelSelect.onchange = function () {
+            _this2.labelMode = _this2._labelSelect.value;_this2._parent.logUpdatedOption(['features', 'labelMode'], _this2.labelMode);
+        };
 
         // Load Key Map
         var self = this;
@@ -30494,18 +30331,16 @@ Keyboard.prototype = {
     },
 
     set useCustomLabels(value) {
-        if (this._useCustomLabels !== value) {
-            this._useCustomLabels = value;
-
-            this._noteCapToggleButton.val.value = this._useCustomLabels;
-            this._noteCapToggleButton.draw();
-
-            if (this._useCustomLabels) {
-                this.mapping.updateNoteLabels();
-            } else {
-                this.buttons.applyTemplate(this._keyTemplate);
-            }
-        }
+        this.labelMode = value ? 'western' : 'keys';
+    },
+    get labelMode() {
+        return this._labelMode || 'keys';
+    },
+    set labelMode(value) {
+        this._labelMode = ['keys', 'western', 'jianpu'].includes(value) ? value : 'keys';
+        this._useCustomLabels = this._labelMode !== 'keys';
+        if (this._labelSelect) this._labelSelect.value = this._labelMode;
+        if (this._useCustomLabels) this.mapping.updateNoteLabels();else if (this._keyTemplate) this.buttons.applyTemplate(this._keyTemplate);
     },
 
     /**
@@ -30566,7 +30401,7 @@ Keyboard.prototype = {
 
 module.exports = Keyboard;
 
-},{"./keyMapper":47,"mused-app-core/js/Util":24,"mused-ui/widget/button-grid":28}],46:[function(require,module,exports){
+},{"./keyMapper":46,"mused-app-core/js/Util":23,"mused-ui/widget/button-grid":27}],45:[function(require,module,exports){
 'use strict';
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
@@ -30669,7 +30504,7 @@ var RootPicker = function () {
 
 module.exports = RootPicker;
 
-},{"mused-ui/widget/note-picker":31}],47:[function(require,module,exports){
+},{"mused-ui/widget/note-picker":30}],46:[function(require,module,exports){
 'use strict';
 
 var Theory = require('./theory.js');
@@ -30773,7 +30608,13 @@ KeyMapper.prototype = {
                     for (var j = 0; j < 13; ++j) {
                         var button = this._parent.buttons.getButtonByName(j + '-' + i);
                         if (button) {
-                            button.label = Theory.nameForNote(button.eventData, this._root, this._pitchSet);
+                            if (this._parent.labelMode === 'jianpu') {
+                                var delta = button.eventData - this._root,
+                                    pc = (delta % 12 + 12) % 12,
+                                    octave = Math.floor(delta / 12);
+                                var names = ['1', '♭2', '2', '♭3', '3', '4', '♯4', '5', '♭6', '6', '♭7', '7'];
+                                button.label = names[pc] + (octave > 0 ? '\u0307'.repeat(octave) : '\u0323'.repeat(-octave));
+                            } else button.label = Theory.nameForNote(button.eventData, this._root, this._pitchSet);
                         }
                     }
                 }
@@ -30833,7 +30674,7 @@ Object.defineProperty(KeyMapper.prototype, 'layout', {
 
 module.exports = KeyMapper;
 
-},{"./theory.js":48}],48:[function(require,module,exports){
+},{"./theory.js":47}],47:[function(require,module,exports){
 "use strict";
 
 var MusEDTheory = function MusEDTheory() {
@@ -31202,7 +31043,7 @@ var Theory = new MusEDTheory();
 
 module.exports = Theory;
 
-},{}],49:[function(require,module,exports){
+},{}],48:[function(require,module,exports){
 'use strict';
 
 var MIDI = function MIDI() {
@@ -31354,7 +31195,7 @@ var MIDI = function MIDI() {
 
 module.exports = new MIDI();
 
-},{}],50:[function(require,module,exports){
+},{}],49:[function(require,module,exports){
 'use strict';
 
 var Util = require('mused-app-core/js/Util');
@@ -31466,7 +31307,7 @@ MyJSONController.prototype = {
 
 module.exports = MyJSONController;
 
-},{"mused-app-core/js/Util":24}],51:[function(require,module,exports){
+},{"mused-app-core/js/Util":23}],50:[function(require,module,exports){
 'use strict';
 
 var MyJSONController = require('./myJsonController.js');
@@ -31758,7 +31599,7 @@ Object.defineProperty(SessionManager.prototype, 'offline', {
 
 module.exports = SessionManager;
 
-},{"./myJsonController.js":50,"mused-app-core/js/internal/ConfigManager":26,"tone":21}],52:[function(require,module,exports){
+},{"./myJsonController.js":49,"mused-app-core/js/internal/ConfigManager":25,"tone":20}],51:[function(require,module,exports){
 'use strict';
 
 /**
@@ -32075,7 +31916,7 @@ Object.defineProperty(Timing.prototype, 'paused', {
 
 module.exports = Timing;
 
-},{}],53:[function(require,module,exports){
+},{}],52:[function(require,module,exports){
 "use strict";
 
 var Util = {
@@ -32098,4 +31939,4 @@ var Util = {
 
 module.exports = Util;
 
-},{}]},{},[39]);
+},{}]},{},[38]);

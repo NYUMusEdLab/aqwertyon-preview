@@ -57,6 +57,8 @@ export function remove(id) {
   writeAll(readAll().filter((t) => t.id !== id));
   document.dispatchEvent(new CustomEvent('aq:takes', { detail: { id, removed: true } }));
 }
+export function clearAll(){const prior=readAll().slice();writeAll([]);document.dispatchEvent(new CustomEvent('aq:takes',{detail:{batch:true}}));return prior;}
+export function restoreCleared(takes){const merged=readAll().slice();for(const t of takes)if(!merged.some(x=>x.id===t.id))merged.push(t);merged.sort((a,b)=>b.ts-a.ts);writeAll(merged);document.dispatchEvent(new CustomEvent('aq:takes',{detail:{batch:true}}));}
 export function rename(id, title) {
   const all = readAll(); const t = all.find((x) => x.id === id);
   if (t) { t.title = title; writeAll(all); document.dispatchEvent(new CustomEvent('aq:takes', { detail: { id } })); }

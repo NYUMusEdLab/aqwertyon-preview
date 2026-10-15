@@ -30297,10 +30297,32 @@ Keyboard.prototype = {
         var label = document.createElement('label');label.textContent = 'Key labels';label.htmlFor = 'keyboard-labels';
         this.noteCapToggle.appendChild(label);
         this._labelSelect = document.createElement('select');this._labelSelect.id = 'keyboard-labels';this._labelSelect.title = 'Jianpu: 1 is the selected root; dots above or below mark higher or lower octaves.';
-        this._labelSelect.innerHTML = '<option value="keys">Keyboard keys</option><option value="western">Western notes</option><option value="jianpu">Jianpu</option>';
+        this._labelSelect.innerHTML = '<option value="keys">Key Names</option><option value="western">Note Names</option><option value="jianpu">Jianpu</option>';
         this.noteCapToggle.appendChild(this._labelSelect);
+        // Return to playing only for pointer/touch choices. Keyboard navigation
+        // retains the native select's focus and Tab order.
+        var pointerLabelChoice = false;
+        this._labelSelect.addEventListener('pointerdown', function (e) {
+            pointerLabelChoice = e.button === 0;
+        });
+        this._labelSelect.addEventListener('keydown', function () {
+            pointerLabelChoice = false;
+        });
+        this._labelSelect.addEventListener('pointercancel', function () {
+            pointerLabelChoice = false;
+        });
+        this._labelSelect.addEventListener('blur', function () {
+            pointerLabelChoice = false;
+        });
         this._labelSelect.onchange = function () {
-            _this2.labelMode = _this2._labelSelect.value;_this2._parent.logUpdatedOption(['features', 'labelMode'], _this2.labelMode);
+            var returnToPlaying = pointerLabelChoice;pointerLabelChoice = false;
+            _this2.releaseAll();
+            _this2.labelMode = _this2._labelSelect.value;
+            _this2._parent.logUpdatedOption(['features', 'labelMode'], _this2.labelMode);
+            if (returnToPlaying) requestAnimationFrame(function () {
+                // A later Tab or click into another control takes precedence.
+                if (document.activeElement === _this2._labelSelect) _this2.keyboardContainer.focus({ preventScroll: true });
+            });
         };
 
         // Load Key Map

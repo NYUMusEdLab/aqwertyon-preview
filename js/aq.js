@@ -30409,8 +30409,14 @@ Keyboard.prototype = {
             var b = heldPointers.get(e.pointerId);if (b) b.release('pointer-' + e.pointerId);heldPointers.delete(e.pointerId);
         };
         node.addEventListener('pointerdown', function (e) {
-            if (e.button !== 0 || !grid._isActive) return;
-            var target = e.target.closest('.mused-button');var b = target && grid._buttonsById[target.id];
+            if (e.button !== 0) return;
+            // A pointer gesture must also dismiss the focus/mobile overlay.
+            // Preventing the compatibility mousedown means it cannot do this for us.
+            node.focus({ preventScroll: true });
+            grid.activate();
+            var hit = document.elementFromPoint(e.clientX, e.clientY);
+            var target = hit && hit.closest('.mused-button');
+            var b = target && node.contains(target) && grid._buttonsById[target.id];
             if (!b) return;e.preventDefault();node.setPointerCapture(e.pointerId);b.attack('pointer-' + e.pointerId);heldPointers.set(e.pointerId, b);
         });
         node.addEventListener('pointermove', function (e) {

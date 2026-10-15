@@ -33,7 +33,7 @@ export function initDuet(app){
   catch(e){if(!enabled||worker!==startingWorker)return;stop();status(e.message);}
  };
  find('duet-stop').onclick=stop;
- function selectMode(value){const ai=value==='ai';box.dataset.playMode=value;box.classList.toggle('duet-active',ai);panel.hidden=!ai;roll.visible(ai);mode.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mode===value)));if(value!=='video'&&app.video.ready)app.video.player.pauseVideo();if(!ai)stop();app.resize();}
+ function selectMode(value){const ai=value==='ai';box.dataset.playMode=value;box.classList.toggle('duet-active',ai);panel.hidden=!ai;roll.visible(ai);mode.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mode===value)));if(value!=='video'&&app.video.ready)app.video.player.pauseVideo();if(!ai&&enabled)stop();app.resize();}
  mode.addEventListener('click',e=>{const b=e.target.closest('[data-mode]');if(b)selectMode(b.dataset.mode);});
  selectMode('play');
  find('duet-keep').onclick=()=>{if(lastReply){TK.save(lastReply);find('duet-keep').disabled=true;status('AI reply saved separately in your Melody Notebook.');}};

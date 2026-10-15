@@ -112,7 +112,7 @@ function init(){
  $('melody-export').onclick=()=>{const url=URL.createObjectURL(new Blob([TK.exportJSON(tool)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='aqwertyon-melodies.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
  $('melody-import').onchange=async e=>{try{const f=e.target.files[0];if(!f)return;if(f.size>5*1024*1024)throw new Error('Choose a JSON file smaller than 5 MB.');const n=TK.importJSON(await f.text());status(n+' melodies imported');}catch(error){status(error.message);}e.target.value='';};
  $('melody-clear').onclick=()=>{stop();const prior=TK.clearAll();if(prior.length){removed=prior;$('melody-undo').textContent='Undo clear all';$('melody-undo').hidden=false;status('Saved melodies cleared. Undo restores them during this visit.');}};
- $('melody-undo').onclick=()=>{if(removed){TK.restoreCleared(removed);removed=null;}$('melody-undo').hidden=true;};
+ $('melody-undo').onclick=()=>{if(removed){TK.restoreCleared(removed);removed=null;status('Saved melodies restored');}$('melody-undo').hidden=true;};
  section.addEventListener('toggle',()=>{if(section.open)render();else if(replayId)stop();});
  window.addEventListener('resize',render);render();
  window.aqNotebook={recorder,replay,play,stop,TK};initDuet(app);

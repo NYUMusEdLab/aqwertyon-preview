@@ -27714,7 +27714,21 @@ PresetPicker.prototype.init = function () {
         name = document.createElement('strong'),
         prompt = document.createElement('p');
     button.type = 'button';button.className = 'app-preset-link';name.textContent = p.name;prompt.textContent = p.prompt;
-    button.appendChild(name);button.appendChild(prompt);button.addEventListener('click', function () {
+    var preview = document.createElement('span'),
+        copy = document.createElement('span');preview.className = 'preset-preview';copy.className = 'preset-copy';
+    var media = document.createElement(i === 0 ? 'video' : 'img');media.className = 'preset-thumbnail';
+    if (i === 0) {
+      media.muted = true;media.playsInline = true;media.preload = 'metadata';media.tabIndex = -1;media.setAttribute('aria-hidden', 'true');media.dataset.previewSrc = 'https://apps.musedlab.org/virtualduet/cmsd/media/piano.mp4';media.addEventListener('loadedmetadata', function () {
+        media.currentTime = Math.min(1, media.duration / 2);
+      });
+    } else {
+      media.alt = '';media.dataset.previewSrc = 'https://i.ytimg.com/vi/R7iNSUoQ4Lk/mqdefault.jpg';
+    }
+    media.addEventListener('error', function () {
+      media.hidden = true;
+    });
+    var play = document.createElement('span');play.className = 'preset-play';play.textContent = '▶';play.setAttribute('aria-hidden', 'true');
+    preview.appendChild(media);preview.appendChild(play);copy.appendChild(name);copy.appendChild(prompt);button.appendChild(preview);button.appendChild(copy);button.addEventListener('click', function () {
       return _this2.selectPreset(i, true);
     });item.appendChild(button);list.appendChild(item);
   });
@@ -27731,6 +27745,9 @@ PresetPicker.prototype.selectPreset = function (index, hide) {
 };
 PresetPicker.prototype.toggleVisibility = function (show) {
   if (show == null) show = this.container.classList.contains('hidden');
+  if (show) this.container.querySelectorAll('[data-preview-src]').forEach(function (media) {
+    media.src = media.dataset.previewSrc;delete media.dataset.previewSrc;
+  });
   this.container.classList.toggle('hidden', !show);this.showPresetsButton.setAttribute('aria-expanded', String(show));
 };
 module.exports = PresetPicker;

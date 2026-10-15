@@ -41,9 +41,9 @@ async function play(take,withVideo){
  for(let i=0;i<100;i++){if(run!==generation)return;if(app.audioControls.sounds._currInstrument&&app.audioControls.sounds._requestedInstrument===sound&&app.audioControls.sounds._loadedInstruments[sound]===app.audioControls.sounds._currInstrument)break;await new Promise(r=>setTimeout(r,100));}
  if(run!==generation)return;
  if(app.audioControls.sounds._loadedInstruments[sound]!==app.audioControls.sounds._currInstrument||!app.audioControls.sounds._currInstrument){stop();status('The melody sound could not load. Check your connection and try again.');return;}
- if(withVideo){app.video.enabled=true;app.video.videoSlug=take.media.id;app.video.start=take.media.offset||0;await app.video.load();if(run!==generation)return;if(!app.video.ready){stop();status('The video could not load. Replay the melody alone or try again.');return;}app.video.player.loadVideoById({videoId:take.media.id,startSeconds:take.media.offset||0});
+ if(withVideo){app.video.enabled=true;app.video.videoSlug=take.media.id;app.video.start=take.media.offset||0;await app.video.load();if(run!==generation)return;if(!app.video.ready){stop();status('The video could not load. Replay the melody alone or try again.');return;}status('Waiting for the video. Finish any YouTube ad or press Play to begin.');
   let playing=false;
-  for(let i=0;i<80;i++){if(run!==generation)return;if(app.video.player.getPlayerState()===1){playing=true;break;}await new Promise(r=>setTimeout(r,100));}
+  for(let i=0;i<900;i++){if(run!==generation)return;if(app.video.lastError)break;if(app.video.player.getPlayerState()===1){playing=true;break;}await new Promise(r=>setTimeout(r,100));}
   if(!playing){stop();status('The video did not start. Press Play in the video or replay the melody alone.');return;}
  }
  else if(app.video.ready)app.video.player.pauseVideo();

@@ -28465,7 +28465,7 @@ Video.prototype.init = function () {
 Video.prototype.load = function () {
   var _this2 = this;
 
-  this.status.textContent = 'Loading YouTube…';
+  this.lastError = null;this.status.textContent = 'Loading YouTube…';
   if (this.ready) {
     this.player.loadVideoById({ videoId: this._videoSlug, startSeconds: this.start });this.status.textContent = 'Press Play if the video does not start.';return Promise.resolve();
   }
@@ -28477,7 +28477,7 @@ Video.prototype.load = function () {
       }, 12000);
       _this2.player = new YT.Player(_this2.mount, { width: '100%', height: 270, videoId: _this2._videoSlug, playerVars: { origin: location.origin, playsinline: 1, disablekb: 1, controls: 1, start: _this2.start }, events: {
           onReady: function onReady(e) {
-            clearTimeout(deadline);_this2.ready = true;_this2.loading = null;e.target.cueVideoById({ videoId: _this2._videoSlug, startSeconds: _this2.start });_this2.status.textContent = 'Press Play in the video to begin.';resolve();
+            clearTimeout(deadline);_this2.ready = true;_this2.loading = null;e.target.loadVideoById({ videoId: _this2._videoSlug, startSeconds: _this2.start });_this2.status.textContent = 'Press Play in the video to begin.';resolve();
           },
           onStateChange: function onStateChange(e) {
             if (e.data === 1) _this2.status.textContent = 'Playing · use the keyboard to play along';else if (e.data === 5) _this2.status.textContent = 'Press Play in the video to begin.';
@@ -28875,6 +28875,9 @@ var Aqwertyon = function (_MusED$AppBase) {
                 option = [option];
             }
 
+            var target = this.options;for (var i = 0; i < option.length - 1; i++) {
+                target = target[option[i]];
+            }target[option[option.length - 1]] = value;
             this.configManager.updateURLOption(option, value);
             this.updateShare();
 
@@ -29052,6 +29055,8 @@ var Aqwertyon = function (_MusED$AppBase) {
     }, {
         key: 'reconfigure',
         value: function reconfigure() {
+            var _this4 = this;
+
             var features = this.options.features;
 
             // ROOT
@@ -29078,6 +29083,14 @@ var Aqwertyon = function (_MusED$AppBase) {
                 this.scoreImage.scoreSrc = this.imageHost + this.options.scoreSlug + '-aqw.png';
             }
             this.scoreImage.toggleVisibility(features.showScore);
+
+            // Share the selected musical configuration, not just its sound/video.
+            ['midiRoot', 'scaleSlug', 'soundSlug', 'videoSlug', 'volume'].forEach(function (k) {
+                return _this4.logUpdatedOption(k, _this4.options[k]);
+            });
+            ['layout', 'useNoteCaps'].forEach(function (k) {
+                return _this4.logUpdatedOption(['features', k], features[k]);
+            });
 
             // FEATURE REGIONS
             this.scalePicker.toggleVisibility(features.allControls && features.scaleControls);

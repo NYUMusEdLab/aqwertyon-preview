@@ -1,13 +1,15 @@
 import * as TK from './takes.mjs';
-import {preparePrompt,shapeReply} from './ai/music.mjs';
+import {preparePrompt,shapeReply,styledReply,replyStyles} from './ai/music.mjs';
 import {createVerticalRoll} from './vertical-roll.mjs';
 export function initDuet(app){
  const box=app.video.container;
  const mode=document.createElement('div');mode.className='duet-mode';mode.setAttribute('role','group');mode.setAttribute('aria-label','Play mode');mode.innerHTML='<button type="button" data-mode="play" aria-pressed="true">Play</button><button type="button" data-mode="video" aria-pressed="false">Play with Video</button><button type="button" data-mode="ai" aria-pressed="false">Play with AI</button>';
  const panel=document.createElement('section');panel.className='duet-panel';panel.hidden=true;
- panel.innerHTML='<h3>Melody AI</h3><p>Play a phrase, then pause. A musical partner answers.</p><div class="duet-controls"><label>Who starts? <select id="duet-first"><option value="human">You first</option><option value="ai">AI first</option></select></label><button type="button" id="duet-start">Start AI</button><button type="button" id="duet-stop" disabled>Stop AI</button><label>Reply style <select id="duet-style"><option value="related">Related</option><option value="explore">Explore</option></select></label></div><p id="duet-status" role="status">Start downloads a 14 MB model and runtime. Your notes stay in this browser.</p><p class="duet-legend"><span>You · teal</span> <span>AI · amber</span></p><canvas id="duet-roll" height="300" role="img" aria-label="Live duet: pitch from left to right; notes rise with time. Human notes are teal and AI notes amber."></canvas><button type="button" id="duet-keep" disabled>Keep AI reply</button><p class="duet-credit">Inspired by <a href="https://yotammann.info/aiexperiments" target="_blank" rel="noopener">A.I. Duet by Yotam Mann and Google Creative Lab</a>. Uses Magenta MelodyRNN, with rhythm and scale adaptation. <a href="notebook/ai/NOTICE.txt" target="_blank">Credits</a></p>';
+ panel.innerHTML='<h3>Melody AI</h3><p>Play a phrase, then pause. A musical partner answers.</p><div class="duet-controls"><label>Who starts? <select id="duet-first"><option value="ai">AI first</option><option value="human">You first</option></select></label><button type="button" id="duet-start">Start AI</button><button type="button" id="duet-stop" disabled>Stop AI</button><label>Reply style <select id="duet-style"><option value="extend">Extend</option><option value="echo">Echo</option><option value="contrast">Contrast</option><option value="complement">Complement</option><option value="harmonize">Harmonize</option></select></label></div><p id="duet-style-help"></p><p id="duet-status" role="status">Selecting AI downloads a 14 MB model and runtime. Your notes stay in this browser.</p><p class="duet-legend"><span>You · teal</span> <span>AI · amber</span></p><canvas id="duet-roll" height="300" role="img" aria-label="Live duet: pitch from left to right; notes rise with time. Human notes are teal and AI notes amber."></canvas><button type="button" id="duet-keep" disabled>Keep AI reply</button><p class="duet-credit">Inspired by <a href="https://yotammann.info/aiexperiments" target="_blank" rel="noopener">A.I. Duet by Yotam Mann and Google Creative Lab</a>. Uses Magenta MelodyRNN, with rhythm and scale adaptation. <a href="notebook/ai/NOTICE.txt" target="_blank">Credits</a></p>';
  box.prepend(panel);box.prepend(mode);
  const find=id=>panel.querySelector('#'+id), status=t=>find('duet-status').textContent=t;
+ find('duet-style-help').textContent=replyStyles[find('duet-style').value];
+ find('duet-style').onchange=()=>{epoch++;queuedTake=null;window.aqNotebook.stop();find('duet-style-help').textContent=replyStyles[find('duet-style').value];};
  let enabled=false,worker=null,ready=false,serial=0,pending=new Map(),epoch=0,lastReply=null,lastPrompt=null,thinking=false,queuedTake=null;
  let opening=false,openingTimer=null;
  const range=()=>[...new Set(Object.values(app.keyboard.buttons._buttonsByName).filter(b=>b.eventType==='midi'&&!b.disabled).map(b=>b.eventData))].sort((a,b)=>a-b);
@@ -24,7 +26,7 @@ export function initDuet(app){
  function dispose(){if(worker)worker.terminate();worker=null;ready=false;thinking=false;for(const p of pending.values()){clearTimeout(p.timeout);p.reject(new Error('Stopped'));}pending.clear();}
  function stop(){opening=false;clearTimeout(openingTimer);find('duet-first').disabled=false;enabled=false;epoch++;queuedTake=null;roll.release();dispose();window.aqNotebook.stop();find('duet-start').disabled=false;find('duet-stop').disabled=true;status('AI stopped. Start it when you want another musical conversation.');}
  find('duet-start').onclick=async()=>{
-  if(enabled)return;opening=find('duet-first').value==='ai';find('duet-first').disabled=true;enabled=true;const run=++epoch;find('duet-start').disabled=true;find('duet-stop').disabled=false;
+  if(enabled)return;app.audioControls.resume();opening=find('duet-first').value==='ai';find('duet-first').disabled=true;enabled=true;const run=++epoch;find('duet-start').disabled=true;find('duet-stop').disabled=false;
   if(app.video.ready)app.video.player.pauseVideo();status('Loading the melody model…');
   worker=new Worker(new URL('./ai/worker.js',import.meta.url));const startingWorker=worker;
   worker.onmessage=({data})=>{const p=pending.get(data.id);if(!p)return;clearTimeout(p.timeout);pending.delete(data.id);data.error?p.reject(new Error(data.error)):p.resolve(data);};
@@ -33,7 +35,7 @@ export function initDuet(app){
   catch(e){if(!enabled||worker!==startingWorker)return;stop();status(e.message);}
  };
  find('duet-stop').onclick=stop;
- function selectMode(value){const ai=value==='ai';box.dataset.playMode=value;box.classList.toggle('duet-active',ai);panel.hidden=!ai;roll.visible(ai);mode.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mode===value)));if(value!=='video'&&app.video.ready)app.video.player.pauseVideo();if(!ai&&enabled)stop();app.resize();}
+ function selectMode(value){const ai=value==='ai';box.dataset.playMode=value;box.classList.toggle('duet-active',ai);panel.hidden=!ai;roll.visible(ai);mode.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mode===value)));if(value!=='video'&&app.video.ready)app.video.player.pauseVideo();if(!ai&&enabled)stop();app.resize();if(ai&&!enabled)find('duet-start').click();}
  mode.addEventListener('click',e=>{const b=e.target.closest('[data-mode]');if(b)selectMode(b.dataset.mode);});
  selectMode('play');
  find('duet-keep').onclick=()=>{if(lastReply){TK.save(lastReply);find('duet-keep').disabled=true;status('AI reply saved separately in your Melody Notebook.');}};
@@ -42,10 +44,16 @@ export function initDuet(app){
   lastPrompt=take;lastReply=null;find('duet-keep').disabled=true;
   const run=++epoch;thinking=true;status('Listening to your phrase and making a reply…');
   try{
-   const prompt=preparePrompt(take),style=find('duet-style').value, allowed=range();
-   const out=await request({type:'reply',sequence:prompt.sequence,steps:prompt.steps,temperature:style==='related'?0.75:1.05});
-   if(run!==epoch||!enabled)return;
-   lastReply=shapeReply(take,prompt,out.sequence,allowed,take.origin==='ai-seed'?'explore':style);if(take.origin==='ai-seed'){lastReply.title='AI opening';delete lastReply.parentTakeId;}find('duet-keep').disabled=false;
+   const style=find('duet-style').value,allowed=range(),isOpening=take.origin==='ai-seed';
+   if(!isOpening&&['echo','harmonize'].includes(style))lastReply=styledReply(take,null,null,allowed,style);
+   else {
+    const prompt=preparePrompt(take);
+    const out=await request({type:'reply',sequence:prompt.sequence,steps:prompt.steps,temperature:style==='contrast'?1.05:0.8});
+    if(run!==epoch||!enabled)return;
+    lastReply=isOpening?shapeReply(take,prompt,out.sequence,allowed,'explore'):styledReply(take,prompt,out.sequence,allowed,style);
+   }
+   if(isOpening){lastReply.title='AI opening';delete lastReply.parentTakeId;}
+   find('duet-keep').disabled=false;
    status('AI’s turn. Play a note whenever you want to take over.');
    await window.aqNotebook.play(lastReply,false);
   }catch(e){if(run===epoch&&enabled)status(e.message);}

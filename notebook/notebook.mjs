@@ -1,3 +1,4 @@
+import './language.mjs';
 import * as TK from './takes.mjs';
 import {initDuet} from './duet.mjs';
 let app,recorder,replay,removed=null,replayId=null,previous=null,liveFrame=0,replayCounts=new Map(),generation=0;
@@ -19,7 +20,7 @@ function render(){
  if(!list.length){const p=document.createElement('p');p.textContent='Play two or more notes over at least 0.8 seconds. After you release the keys and pause for 2.5 seconds, your melody appears here.';host.append(p);}
  for(const take of list){
   const card=document.createElement('article');card.className='melody-card';card.dataset.id=take.id;
-  const title=document.createElement('input');title.type='text';title.maxLength=200;title.value=take.title||'Untitled melody';title.setAttribute('aria-label','Melody name');title.addEventListener('change',()=>TK.rename(take.id,title.value.trim()));
+  const title=document.createElement('input');title.type='text';title.maxLength=200;title.value=take.title||'';title.placeholder='Untitled melody';title.setAttribute('aria-label','Melody name');title.addEventListener('change',()=>TK.rename(take.id,title.value.trim()));
   const info=document.createElement('p');info.textContent=(take.origin==='ai'?'AI reply · ':'')+`${(take.duration/1000).toFixed(1)} s · ${take.cfg?.scaleSlug||'scale'} · ${take.cfg?.soundSlug?.replaceAll('_',' ')||'sound'}`;
   const canvas=document.createElement('canvas');canvas.height=100;canvas.setAttribute('role','img');canvas.setAttribute('aria-label','Piano roll of '+(take.title||'untitled melody'));
   const controls=document.createElement('div');controls.className='melody-actions';

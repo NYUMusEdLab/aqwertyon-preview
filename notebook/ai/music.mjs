@@ -8,7 +8,7 @@ export function phraseNotes(take){
  return mono.slice(-32);
 }
 export function preparePrompt(take){
- const notes=phraseNotes(take);if(notes.length<2)throw new Error('Play a phrase with at least two separate notes, then pause.');
+ const notes=phraseNotes(take);if(!notes.length)throw new Error('Play a phrase, then pause.');if(notes.length===1){const n=notes[0];notes.push({...n,start:n.end+150,end:n.end+450});}
  const first=notes[0].start, gaps=notes.slice(1).map((n,i)=>n.start-notes[i].start).sort((a,b)=>a-b);
  // Treat typical onset spacing as an eighth note, retaining expressive timing in the reply.
  const beat=Math.max(300,Math.min(1000,gaps[Math.floor(gaps.length/2)]*2));const step=beat/4;
@@ -45,6 +45,42 @@ export function shapeReply(take,prompt,generated,allowed,style='related'){
   const end=Math.max(start+65,Math.round((Math.min(n.end,next?.start??n.end)-first)*timeScale));
   events.push({type:'on',midi,code:'ai-'+i,t:start},{type:'off',midi,code:'ai-'+i,t:end});last=midi;
  }
- events.sort((a,b)=>a.t-b.t||(a.type==='off'?-1:1));
+ events.sort((a,b)=>a.t-b.t||(a.type===b.type?0:a.type==='off'?-1:1));
  return {id:'ai_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8),tool:'aqwertyon-preview',ts:Date.now(),title:'AI reply · '+(take.title||'your phrase').slice(0,150),origin:'ai',parentTakeId:take.id,model:'Magenta basic_rnn',cfg:{...take.cfg},duration:Math.max(...events.map(e=>e.t)),events};
+}
+
+export const replyStyles={
+ echo:'Repeat your notes, chords and timing exactly.',
+ extend:'Recall the end of your phrase, then continue with new model-generated notes.',
+ contrast:'Answer with an inverted melodic shape and a different rhythmic pace.',
+ complement:'Answer more sparsely, placing notes between the beats of your phrase.',
+ harmonize:'Replay your phrase with an added consonant voice from the selected scale.'
+};
+export function styledReply(take,prompt,generated,allowed,style){
+ const make=events=>({id:'ai_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8),tool:'aqwertyon-preview',ts:Date.now(),title:style[0].toUpperCase()+style.slice(1)+' · '+(take.title||'your phrase').slice(0,140),origin:'ai',parentTakeId:take.id,replyStyle:style,model:['echo','harmonize'].includes(style)?'Local musical transformation':'Magenta basic_rnn + musical transformation',cfg:{...take.cfg},duration:Math.max(...events.map(e=>e.t)),events:events.sort((a,b)=>a.t-b.t||(a.type===b.type?0:a.type==='off'?-1:1))});
+ if(style==='echo')return make(take.events.map(e=>({...e})));
+ if(style==='harmonize'){
+  const events=take.events.map(e=>({...e})), held=new Map();let voice=0;
+  for(const e of take.events){const key=e.code||String(e.midi);
+   if(e.type==='on'){
+    const chord=take.events.filter(n=>n.type==='on'&&Math.abs(n.t-e.t)<45).map(n=>n.midi);
+    const choices=allowed.filter(p=>!chord.includes(p)&&[3,4,7,8,9,12].includes(Math.abs(e.midi-p))&&chord.every(n=>![1,2,10,11].includes(((p-n)%12+12)%12)));
+    if(!choices.length)continue;const midi=choices.reduce((a,b)=>Math.abs(b-e.midi)<Math.abs(a-e.midi)?b:a,choices[0]),code='harmony-'+voice++;held.set(key,{midi,code});events.push({type:'on',midi,code,t:e.t});
+   }else if(held.has(key)){events.push({type:'off',...held.get(key),t:e.t});held.delete(key);}
+  }
+  return make(events);
+ }
+ const base=shapeReply(take,prompt,generated,allowed,'explore'), notes=phraseNotes(base), source=prompt.notes,events=[];
+ const add=(midi,t,end,i)=>events.push({type:'on',midi,code:'style-'+i,t:Math.round(t)},{type:'off',midi,code:'style-'+i,t:Math.round(Math.max(t+70,end))});
+ if(style==='extend'){
+  const tail=source.slice(-2),zero=tail[0].start;tail.forEach((n,i)=>add(nearest(n.pitch,allowed),n.start-zero,n.end-zero,i));
+  const offset=Math.max(...events.map(e=>e.t))+prompt.beat/4;
+  notes.forEach((n,i)=>add(n.pitch,offset+n.start,offset+n.end,i+2));
+ }else if(style==='contrast'){
+  const center=source.reduce((s,n)=>s+n.pitch,0)/source.length;
+  source.slice(0,16).forEach((n,i)=>{const t=i*prompt.beat*.75;add(nearest(2*center-n.pitch,allowed),t,t+prompt.beat*.48,i);});
+ }else if(style==='complement'){
+  notes.filter((n,i)=>i%2===0).forEach((n,i)=>{const t=i*prompt.beat+prompt.beat/2;add(n.pitch,t,t+prompt.beat*.35,i);});
+ }else return base;
+ return make(events);
 }

@@ -31,3 +31,5 @@ header #logo1{position:static;flex-shrink:0;height:50px;background-size:110px au
 .duet-mode{flex-wrap:wrap}.duet-mode button[aria-pressed="true"]{background:#155b60;color:white;border-color:#155b60}.videoBlk[data-play-mode="play"]>:not(.duet-mode){display:none!important}#videoToggle{display:none!important}#keyboard-labels{font:inherit;max-width:100%;padding:6px}.mused-button{line-height:1.5}
 
 #keyboard-labels{color:#153a39;background:#fff;border:1px solid #94abaa;border-radius:4px}
+
+#language-switch{display:flex;gap:4px;margin-left:8px}#language-switch button{font-size:13px;padding:6px 9px}#language-switch [aria-pressed="true"]{background:#155b60;color:white}html[lang="zh-CN"] .duet-panel{line-height:1.6}

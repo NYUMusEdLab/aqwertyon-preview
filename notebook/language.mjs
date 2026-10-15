@@ -1,5 +1,6 @@
 // UI translation only. Never rewrites input values, saved titles, musical data or URLs.
 const pairs={
+'Octave':'八度','Live staff notation':'实时五线谱',
 'Explore notes':'探索音符','Off':'关闭','Scale wheel':'音阶轮','Staff':'五线谱','Pitch order':'音高排列','Circle of Fifths':'五度圈','Live pitches in the selected scale':'所选音阶的实时音高','Play notes to see their pitches.':'演奏音符以查看音高。',
 'Replaying melody':'正在重听旋律','Replaying with the video':'正在跟随视频重听',
 'The melody sound could not load. Check your connection and try again.':'无法加载旋律音色。请检查网络后重试。',

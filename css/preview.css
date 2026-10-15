@@ -126,7 +126,8 @@ header #session{gap:8px;font-size:14px;line-height:1.2;min-width:0}header #share
   font-size: 13px;
   font-weight: 600;
 }
-.duet-panel h3 + p {
+.duet-panel h3 + p,
+.duet-panel > p:first-of-type {
   margin: 10px 0 16px;
   font-size: 13px;
   line-height: 1.5;

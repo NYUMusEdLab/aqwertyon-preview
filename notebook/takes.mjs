@@ -23,11 +23,11 @@ let persistent = true;
 const PITCHES = new Set(Array.from({length:128},(_,i)=>i));
 export function validTake(t) {
   return !!(t && typeof t.id === 'string' && t.id.length < 120 && t.tool === 'aqwertyon-preview' &&
-    (!t.title || (typeof t.title==='string' && t.title.length<=200)) && Number.isFinite(t.ts) && Number.isFinite(t.duration) && t.duration >= 0 && t.duration <= 91000 &&
-    (!t.media || (typeof t.media.id==='string' && /^[A-Za-z0-9_-]{11}$/.test(t.media.id) && Number.isFinite(t.media.offset) && t.media.offset>=0 && t.media.offset<=86400)) &&
+    (!t.title || (typeof t.title==='string' && t.title.length<=200)) && Number.isFinite(t.ts) && Number.isFinite(t.duration) && t.duration >= 0 && t.duration <= (t.kind==='conversation'?1200000:91000) &&
+    (!t.media || (typeof t.media.id==='string' && (t.media.id==='cmsd'||/^[A-Za-z0-9_-]{11}$/.test(t.media.id)) && Number.isFinite(t.media.offset) && t.media.offset>=0 && t.media.offset<=86400)) &&
     (!t.cfg || (typeof t.cfg==='object' && (!t.cfg.soundSlug || (typeof t.cfg.soundSlug==='string' && /^[a-z0-9_]{1,80}$/.test(t.cfg.soundSlug))))) &&
-    Array.isArray(t.events) && t.events.length > 0 && t.events.length <= 12000 &&
-    t.events.every(e => e && (e.type === 'on' || e.type === 'off') && PITCHES.has(e.midi) && Number.isFinite(e.t) && e.t >= 0 && e.t <= t.duration && (!e.code || (typeof e.code === 'string' && e.code.length < 80))));
+    Array.isArray(t.events) && t.events.length > 0 && t.events.length <= (t.kind==='conversation'?24000:12000) &&
+    t.events.every(e => e && (e.type === 'on' || e.type === 'off') && PITCHES.has(e.midi) && Number.isFinite(e.t) && e.t >= 0 && e.t <= t.duration && (!e.code || (typeof e.code === 'string' && e.code.length < 80)) && (t.kind!=='conversation'||(['human','ai'].includes(e.voice)&&(e.type==='off'||(e.cfg&&typeof e.cfg.soundSlug==='string'&&/^[a-z0-9_]{1,80}$/.test(e.cfg.soundSlug)&&Number.isFinite(e.cfg.volume)&&e.cfg.volume>=0&&e.cfg.volume<=1))))));
 }
 function readAll() {
   if (!persistent) return memory;
@@ -153,7 +153,7 @@ export function toBars(events) {
   const open = new Map(); const bars = [];
   for (const e of events) {
     const token = e.code || String(e.midi);
-    if (e.type === 'on') { if (open.has(token)) open.get(token).end = e.t; open.set(token, { midi: e.midi, start: e.t, end: null }); bars.push(open.get(token)); }
+    if (e.type === 'on') { if (open.has(token)) open.get(token).end = e.t; open.set(token, { midi: e.midi, voice:e.voice, start: e.t, end: null }); bars.push(open.get(token)); }
     else if (e.type === 'off' && open.has(token)) { open.get(token).end = e.t; open.delete(token); }
   }
   const last = events.length ? events[events.length - 1].t : 0;
@@ -210,7 +210,7 @@ export function drawRoll(canvas, events, opts) {
     if (row === undefined) { hollow = true; row = b.midi < lo ? -0.5 : b.midi > hi ? rows - 0.5 : midis.findIndex((m) => m > b.midi) - 0.5; }
     const bx = x(b.start), bw = Math.max(2, x(b.end) - x(b.start));
     const by = y(row) + Math.max(1, rh * 0.15), bh = Math.max(2, rh * 0.7);
-    ctx.fillStyle = o.barFor ? o.barFor(b.midi) : c.bar; ctx.strokeStyle = c.barEdge; ctx.lineWidth = 1;
+    ctx.fillStyle = o.barFor ? o.barFor(b.midi,b) : c.bar; ctx.strokeStyle = c.barEdge; ctx.lineWidth = 1;
     if (hollow) { ctx.strokeRect(bx + .5, by + .5, bw - 1, bh - 1); }
     else { ctx.fillRect(bx, by, bw, bh); }
   }
@@ -230,7 +230,7 @@ export function createPlayer(sink) {
   function stop(silent) {
     if (!active) return;
     cancelAnimationFrame(active.raf);
-    for (const e of active.sounding.values()) sink.noteOff(e.midi, e.code);
+    for (const e of active.sounding.values()) sink.noteOff(e.midi, e.code, e);
     const ended = active; active = null;
     if (!silent && ended.onEnd) ended.onEnd();
   }
@@ -249,8 +249,8 @@ export function createPlayer(sink) {
         const now = performance.now() - t0;
         while (i < ev.length && ev[i].t <= now) {
           const e = ev[i++];
-          if (e.type === 'on') { sink.noteOn(e.midi, e.code); st.sounding.set(e.code || String(e.midi), e); }
-          else { sink.noteOff(e.midi, e.code); st.sounding.delete(e.code || String(e.midi)); }
+          if (e.type === 'on') { sink.noteOn(e.midi, e.code, e); st.sounding.set(e.code || String(e.midi), e); }
+          else { sink.noteOff(e.midi, e.code, e); st.sounding.delete(e.code || String(e.midi)); }
         }
         if (hooks.onTick) hooks.onTick(Math.min(now, take.duration));
         if (i >= ev.length && now >= take.duration) { stop(); return; }

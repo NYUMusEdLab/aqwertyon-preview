@@ -27439,289 +27439,30 @@ module.exports = NotePicker;
 
 },{"../../button-grid/js/ButtonGrid":29}],32:[function(require,module,exports){
 module.exports={
-  "title": "aQWERTYon Tasting Menu",
+  "title": "Starting demos",
   "sequence": [
     {
-      "name": "Michael Jackson - \"Don't Stop Til You Get Enough\"",
-      "prompt": "Enjoy the vintage late 70s video FX",
-      "options": {
-        "scoreSlug": null,
-        "features": {
-          "layout": "1-3-5-7",
-          "scaleControls": true,
-          "showTakes": false,
-          "allControls": true,
-          "showVideo": true,
-          "showScore": false,
-          "showSounds": true,
-          "showKeyboard": true,
-          "showSetup": true,
-          "useNoteCaps": true
-        },
-        "midiRoot": 59,
-        "audio": {
-          "volume": 0.5,
-          "soundSet": "soundfont",
-          "soundSlug": "rock_organ"
-        },
-        "video": {
-          "videoSlug": "yURRmWtbTbo",
-          "readOnly": false,
-          "showVideo": true
-        },
-        "scaleSlug": "mixolydian"
-      },
-      "version": 1
-    },
-    {
-      "name": "Adele - \"Send My Love (To Your New Lover)\"",
-      "prompt": "Adele's harmonies sound complicated, but they're all within the D major scale",
-      "options": {
-        "volume": 0.8,
-        "features": {
-          "layout": "1-3-5-7",
-          "scaleControls": true,
-          "showTakes": false,
-          "allControls": true,
-          "audioEngine": "soundfont",
-          "showVideo": true,
-          "showScore": false,
-          "showSounds": true,
-          "showKeyboard": true,
-          "useNoteCaps": true
-        },
-        "midiRoot": 62,
-        "videoSlug": "fk4BbF7B29w",
-        "scaleSlug": "major",
-        "scoreSlug": null,
-        "soundSlug": "rock_organ"
-      },
-      "version": 1
-    },
-    {
-      "name": "Daft Punk - \"Get Lucky\"",
-      "prompt": "Play the chords with the roots B, D, F-sharp and E",
-      "options": {
-        "volume": 0.6,
-        "features": {
-          "layout": "1-3-5-8",
-          "scaleControls": true,
-          "showTakes": false,
-          "allControls": true,
-          "audioEngine": "soundfont",
-          "showVideo": true,
-          "showScore": false,
-          "showSounds": true,
-          "showKeyboard": true,
-          "useNoteCaps": true
-        },
-        "midiRoot": 59,
-        "videoSlug": "FoB9OiTJw40",
-        "scaleSlug": "dorian",
-        "scoreSlug": null,
-        "soundSlug": "lead_2_sawtooth"
-      },
-      "version": 1
-    },
-    {
-      "name": "Beyonc\u00e9 - \"Single Ladies (Put a Ring on It)\"",
-      "prompt": "Feel the combined major and minor feeling of this tune",
-      "options": {
-        "volume": 0.8,
-        "features": {
-          "layout": "1-3-5-7",
-          "scaleControls": true,
-          "showTakes": false,
-          "allControls": true,
-          "audioEngine": "soundfont",
-          "showVideo": true,
-          "showScore": false,
-          "showSounds": true,
-          "showKeyboard": true,
-          "useNoteCaps": true
-        },
-        "midiRoot": 64,
-        "videoSlug": "4m1EFMoRFvY",
-        "scaleSlug": "harmonic-major",
-        "scoreSlug": null,
-        "soundSlug": "lead_1_square"
-      },
-      "version": 1
-    },
-    {
-      "name": "Drake - \"Hotline Bling\"",
-      "prompt": "Give Hotline Bling some lead bling",
-      "options": {
-        "volume": 0.8,
-        "features": {
-          "layout": "1-3-5-7",
-          "scaleControls": true,
-          "showTakes": false,
-          "allControls": true,
-          "audioEngine": "soundfont",
-          "showVideo": true,
-          "showScore": false,
-          "showSounds": true,
-          "showKeyboard": true,
-          "useNoteCaps": true
-        },
-        "midiRoot": 62,
-        "videoSlug": "uxpDa-c-4Mc",
-        "scaleSlug": "natural-minor",
-        "scoreSlug": null,
-        "soundSlug": "lead_2_sawtooth"
-      },
-      "version": 1
-    },
-    {
-      "name": "Katy Perry - \"Teenage Dream\"",
-      "prompt": "Uses the exotic Lydian mode",
-      "options": {
-        "volume": 0.8,
-        "features": {
-          "layout": "1-3-5-8",
-          "scaleControls": true,
-          "showTakes": false,
-          "allControls": true,
-          "audioEngine": "soundfont",
-          "showVideo": true,
-          "showScore": false,
-          "showSounds": true,
-          "showKeyboard": true,
-          "useNoteCaps": true
-        },
-        "midiRoot": 63,
-        "videoSlug": "98WtmW-lfeE",
-        "scaleSlug": "lydian",
-        "scoreSlug": null,
-        "soundSlug": "synth_strings_1"
-      },
-      "version": 1
-    },
-    {
-      "name": "Chance the Rapper - \"Blessings (Reprise)\"",
-      "prompt": "Find the melody and rhythm in Chance's vocals",
-      "options": {
-        "volume": 0.8,
-        "features": {
-          "layout": "1-3-5-7",
-          "scaleControls": true,
-          "showTakes": false,
-          "allControls": true,
-          "audioEngine": "soundfont",
-          "showVideo": true,
-          "showScore": false,
-          "showSounds": true,
-          "showKeyboard": true,
-          "useNoteCaps": true
-        },
-        "midiRoot": 56,
-        "videoSlug": "RVxonKmCLL8",
-        "scaleSlug": "major",
-        "scoreSlug": null,
-        "soundSlug": "rock_organ"
-      },
-      "version": 1
-    },
-    {
-      "name": "AC/DC - \"Back In Black\"",
-      "prompt": "Why is the guitarist wearing his school uniform?",
+      "name": "CMSD · Virtual Piano Duet",
+      "prompt": "Improvise on the black keys with Steve Wogaman. Video streams directly from MusEDLab.",
+      "version": 2,
       "options": {
         "volume": 0.5,
+        "midiRoot": 66,
+        "videoSlug": "cmsd",
+        "scaleSlug": "major-pentatonic",
+        "soundSlug": "acoustic_grand_piano",
+        "scoreSlug": null,
         "features": {
-          "layout": "1-3-5-7",
-          "scaleControls": true,
-          "showTakes": false,
-          "allControls": true,
+          "layout": "1-3-5-8",
           "audioEngine": "soundfont",
           "showVideo": true,
-          "showScore": false,
-          "showSounds": true,
           "showKeyboard": true,
-          "useNoteCaps": true
-        },
-        "midiRoot": 64,
-        "videoSlug": "pAgnJDJN4VA",
-        "scaleSlug": "dorian",
-        "scoreSlug": null,
-        "soundSlug": "rock_organ"
-      },
-      "version": 1
-    },
-    {
-      "name": "Bj\u00f6rk - \"All Is Full Of Love\"",
-      "prompt": "An uplifting message in a sad-sounding key",
-      "options": {
-        "volume": 0.8,
-        "features": {
-          "layout": "1-3-5-7",
-          "scaleControls": true,
-          "showTakes": false,
+          "showSounds": true,
           "allControls": true,
-          "audioEngine": "soundfont",
-          "showVideo": true,
-          "showScore": false,
-          "showSounds": true,
-          "showKeyboard": true,
-          "useNoteCaps": true
-        },
-        "midiRoot": 70,
-        "videoSlug": "AjI2J2SQ528",
-        "scaleSlug": "natural-minor",
-        "scoreSlug": null,
-        "soundSlug": "lead_2_sawtooth"
-      },
-      "version": 1
-    },
-    {
-      "name": "Miles Davis - \"Shhh/Peaceful\"",
-      "prompt": "A jazz fusion classic",
-      "options": {
-        "volume": 0.8,
-        "features": {
-          "layout": "1-3-5-7",
           "scaleControls": true,
-          "showTakes": false,
-          "allControls": true,
-          "audioEngine": "soundfont",
-          "showVideo": true,
-          "showScore": false,
-          "showSounds": true,
-          "showKeyboard": true,
           "useNoteCaps": true
-        },
-        "midiRoot": 62,
-        "videoSlug": "X-OzELPUXqQ",
-        "scaleSlug": "mixolydian",
-        "scoreSlug": null,
-        "soundSlug": "rock_organ"
-      },
-      "version": 1
-    },
-    {
-      "name": "Missy Elliott - \"Get Ur Freak On\"",
-      "prompt": "Enjoy the Middle Eastern flavor of Phrygian mode",
-      "options": {
-        "volume": 0.8,
-        "features": {
-          "layout": "1-3-5-7",
-          "scaleControls": true,
-          "showTakes": false,
-          "allControls": true,
-          "audioEngine": "soundfont",
-          "showVideo": true,
-          "showScore": false,
-          "showSounds": true,
-          "showKeyboard": true,
-          "useNoteCaps": true
-        },
-        "midiRoot": 65,
-        "videoSlug": "QRF5lOoNXT4",
-        "scaleSlug": "phrygian",
-        "scoreSlug": null,
-        "soundSlug": "rock_organ"
-      },
-      "version": 1
+        }
+      }
     },
     {
       "name": "James Brown - \"Think\" (loop)",
@@ -28218,8 +27959,9 @@ module.exports = Score;
 },{}],37:[function(require,module,exports){
 'use strict';
 
+var CMSD_VIDEO = 'https://apps.musedlab.org/virtualduet/cmsd/media/piano.mp4';
 function parseVideo(value) {
-  value = String(value || '').trim();if (/^[\w-]{11}$/.test(value)) return { id: value, start: 0 };
+  value = String(value || '').trim();if (value === 'cmsd' || value === CMSD_VIDEO) return { id: 'cmsd', start: 0 };if (/^[\w-]{11}$/.test(value)) return { id: value, start: 0 };
   try {
     var u = new URL(value),
         host = u.hostname.toLowerCase();if (!['https:', 'http:'].includes(u.protocol)) return null;var id = void 0;
@@ -28254,14 +27996,14 @@ function loadAPI() {
   });return apiPromise;
 }
 function Video(parent) {
-  this.parent = parent;this._enabled = true;this._videoSlug = '';this.start = 0;this.player = null;this.ready = false;this._showVideoURLControl = true;
+  this.parent = parent;this._enabled = true;this._videoSlug = '';this.generation = 0;this.start = 0;this.player = null;this.ready = false;this._showVideoURLControl = true;
 }
 Video.parseVideo = parseVideo;
 Video.prototype.init = function () {
   var _this = this;
 
   this.container = document.createElement('div');this.container.className = 'videoBlk';
-  var form = document.createElement('form');form.className = 'video-form';
+  var form = document.createElement('form');this.form = form;form.className = 'video-form';
   this._videoURL = document.createElement('input');this._videoURL.type = 'text';this._videoURL.placeholder = 'YouTube link or video ID';this._videoURL.setAttribute('aria-label', 'YouTube link or video ID');
   this.loadButton = document.createElement('button');this.loadButton.type = 'submit';this.loadButton.textContent = 'Load video';
   form.appendChild(this._videoURL);form.appendChild(this.loadButton);this.container.appendChild(form);
@@ -28285,9 +28027,64 @@ Video.prototype.init = function () {
     }
   });
 };
-Video.prototype.load = function () {
+Video.prototype.loadNative = function () {
   var _this2 = this;
 
+  this.lastError = null;
+  if (!this.native) {
+    var _video = document.createElement('video');_video.controls = true;_video.playsInline = true;_video.loop = true;_video.preload = 'metadata';_video.src = CMSD_VIDEO;_video.setAttribute('aria-label', 'CMSD piano duet video');this.mount.replaceChildren(_video);this.native = _video;
+    _video.addEventListener('error', function () {
+      _this2.lastError = 'native';_this2.status.textContent = 'CMSD video could not load. You can still play the instrument.';
+    });
+    _video.addEventListener('play', function () {
+      _this2.status.textContent = 'Playing · use the keyboard to play along';
+    });
+    this.player = { pauseVideo: function pauseVideo() {
+        return _video.pause();
+      }, playVideo: function playVideo() {
+        return _video.play().catch(function () {
+          _this2.status.textContent = 'Press Play in the video to begin.';
+        });
+      }, seekTo: function seekTo(t) {
+        _this2.start = t;if (_video.readyState >= 1) _video.currentTime = t;
+      }, getCurrentTime: function getCurrentTime() {
+        return _video.currentTime;
+      }, getPlayerState: function getPlayerState() {
+        return !_video.paused && _video.readyState >= 3 ? 1 : 2;
+      }, getVideoData: function getVideoData() {
+        return { video_id: 'cmsd' };
+      }, destroy: function destroy() {
+        _video.pause();_video.removeAttribute('src');_video.load();_video.remove();
+      } };
+  }
+  var video = this.native;
+  var begin = function begin() {
+    if (_this2.native !== video) return;video.currentTime = _this2.start || 0;_this2.ready = true;_this2.player.playVideo();
+  };
+  if (video.readyState >= 1) {
+    begin();return Promise.resolve();
+  }
+  if (this.loading) return this.loading;
+  this.loading = new Promise(function (resolve) {
+    var finish = function finish() {
+      clearTimeout(timer);video.removeEventListener('loadedmetadata', loaded);video.removeEventListener('error', failed);if (_this2.native === video) _this2.loading = null;resolve();
+    };
+    var loaded = function loaded() {
+      begin();finish();
+    };
+    var failed = function failed() {
+      if (_this2.native === video) {
+        _this2.lastError = 'native';_this2.status.textContent = 'CMSD video could not load. You can still play the instrument.';
+      }finish();
+    };
+    var timer = setTimeout(failed, 15000);video.addEventListener('loadedmetadata', loaded, { once: true });video.addEventListener('error', failed, { once: true });
+  });return this.loading;
+};
+Video.prototype.load = function () {
+  var _this3 = this;
+
+  if (this._videoSlug === 'cmsd') return this.loadNative();
+  var generation = this.generation;
   this.lastError = null;this.status.textContent = 'Loading YouTube…';
   if (this.ready) {
     this.player.loadVideoById({ videoId: this._videoSlug, startSeconds: this.start });this.status.textContent = 'Press Play if the video does not start.';return Promise.resolve();
@@ -28295,26 +28092,35 @@ Video.prototype.load = function () {
   if (this.loading) return this.loading;
   this.loading = loadAPI().then(function (YT) {
     return new Promise(function (resolve, reject) {
+      if (generation !== _this3.generation) {
+        resolve();return;
+      }
       var deadline = setTimeout(function () {
-        _this2.ready = false;if (_this2.player) _this2.player.destroy();_this2.mount = document.createElement('div');_this2.mount.id = 'aq-youtube-player';_this2.container.insertBefore(_this2.mount, _this2.watch);reject(new Error('YouTube player did not become ready. Check your connection or open the video on YouTube.'));
+        if (generation !== _this3.generation) {
+          resolve();return;
+        }_this3.ready = false;if (_this3.player) _this3.player.destroy();_this3.mount = document.createElement('div');_this3.mount.id = 'aq-youtube-player';_this3.container.insertBefore(_this3.mount, _this3.watch);reject(new Error('YouTube player did not become ready. Check your connection or open the video on YouTube.'));
       }, 12000);
-      _this2.player = new YT.Player(_this2.mount, { width: '100%', height: 270, videoId: _this2._videoSlug, playerVars: { origin: location.origin, playsinline: 1, disablekb: 1, controls: 1, start: _this2.start }, events: {
+      _this3.player = new YT.Player(_this3.mount, { width: '100%', height: 270, videoId: _this3._videoSlug, playerVars: { origin: location.origin, playsinline: 1, disablekb: 1, controls: 1, start: _this3.start }, events: {
           onReady: function onReady(e) {
-            clearTimeout(deadline);_this2.ready = true;_this2.loading = null;e.target.loadVideoById({ videoId: _this2._videoSlug, startSeconds: _this2.start });_this2.status.textContent = 'Press Play in the video to begin.';resolve();
+            clearTimeout(deadline);if (generation !== _this3.generation) {
+              e.target.destroy();resolve();return;
+            }_this3.ready = true;_this3.loading = null;e.target.loadVideoById({ videoId: _this3._videoSlug, startSeconds: _this3.start });_this3.status.textContent = 'Press Play in the video to begin.';resolve();
           },
           onStateChange: function onStateChange(e) {
-            if (e.data === 1) _this2.status.textContent = 'Playing · use the keyboard to play along';else if (e.data === 5) _this2.status.textContent = 'Press Play in the video to begin.';
+            if (e.data === 1) _this3.status.textContent = 'Playing · use the keyboard to play along';else if (e.data === 5) _this3.status.textContent = 'Press Play in the video to begin.';
           },
           onError: function onError(e) {
-            _this2.lastError = e.data;var errors = { 2: 'Invalid video link.', 5: 'This browser cannot play this video.', 100: 'This video was removed or is private.', 101: 'YouTube is refusing embedded playback for this video.', 150: 'YouTube is refusing embedded playback for this video.', 153: 'YouTube could not identify this page. Open this preview directly in your browser.' };_this2.status.textContent = (errors[e.data] || 'YouTube could not play this video.') + ' Try another video or open it on YouTube.';
+            _this3.lastError = e.data;var errors = { 2: 'Invalid video link.', 5: 'This browser cannot play this video.', 100: 'This video was removed or is private.', 101: 'YouTube is refusing embedded playback for this video.', 150: 'YouTube is refusing embedded playback for this video.', 153: 'YouTube could not identify this page. Open this preview directly in your browser.' };_this3.status.textContent = (errors[e.data] || 'YouTube could not play this video.') + ' Try another video or open it on YouTube.';
           },
           onAutoplayBlocked: function onAutoplayBlocked() {
-            _this2.status.textContent = 'Press Play in the video to begin.';
+            _this3.status.textContent = 'Press Play in the video to begin.';
           }
         } });
     });
   }).catch(function (e) {
-    _this2.loading = null;_this2.status.textContent = e.message;
+    if (generation === _this3.generation) {
+      _this3.loading = null;_this3.status.textContent = e.message;
+    }
   });return this.loading;
 };
 Object.defineProperties(Video.prototype, {
@@ -28323,9 +28129,16 @@ Object.defineProperties(Video.prototype, {
       return this._videoSlug;
     },
     set: function set(value) {
-      var p = parseVideo(value);if (!p) return;var changed = p.id !== this._videoSlug;this._videoSlug = p.id;this.watch.href = 'https://www.youtube.com/watch?v=' + p.id;this._videoURL.value = this.watch.href;if (changed) {
-        this.lastError = null;this.start = 0;this.status.textContent = 'Video selected. Choose Load video to connect to YouTube.';if (this.ready) this.player.cueVideoById(p.id, 0);
-      }this.parent.logUpdatedOption('videoSlug', p.id);
+      var p = parseVideo(value);if (!p) return;var changed = p.id !== this._videoSlug,
+          native = p.id === 'cmsd';
+      if (changed && (this._videoSlug === 'cmsd' || native)) {
+        this.generation++;if (this.player) this.player.destroy();this.player = null;this.native = null;this.ready = false;this.loading = null;this.mount.remove();this.mount = document.createElement('div');this.mount.id = 'aq-youtube-player';this.container.insertBefore(this.mount, this.watch);
+      }
+      this._videoSlug = p.id;this.form.hidden = native;this.watch.href = native ? CMSD_VIDEO : 'https://www.youtube.com/watch?v=' + p.id;this.watch.textContent = native ? 'CMSD · Steve Wogaman · Open video ↗' : 'Open on YouTube ↗';this._videoURL.value = native ? CMSD_VIDEO : this.watch.href;
+      if (changed) {
+        this.lastError = null;this.start = 0;this.status.textContent = native ? 'CMSD piano duet · Composition and performance by Steve Wogaman.' : 'Video selected. Choose Load video to connect to YouTube.';if (this.ready && !native) this.player.cueVideoById(p.id, 0);if (native && this.container.dataset.playMode === 'video') this.load();
+      }
+      this.parent.logUpdatedOption('videoSlug', p.id);
     }
   },
   enabled: {
@@ -28365,9 +28178,11 @@ if (Aqwertyon.prototype.isLocal) {
     audioEngineDefault = 'classic'; // developer must manually comment this out to change default after adding soundfont assets to a MusEDBox
 }
 
-var videoDefault = 'R7iNSUoQ4Lk'; // James Brown, "Think"
-var soundDefault = audioEngineDefault == 'soundfont' ? 'rock_organ' : 'bessie';
-var rootDefault = audioEngineDefault == 'soundfont' ? 62 : 50; // D5, D4
+var sharedVideo = new URLSearchParams(location.search).get('video');
+var useCMSDDefault = !sharedVideo || sharedVideo === 'cmsd';
+var videoDefault = 'cmsd'; // Existing MusEDLab-hosted CMSD piano duet
+var soundDefault = audioEngineDefault == 'soundfont' ? useCMSDDefault ? 'acoustic_grand_piano' : 'rock_organ' : 'bessie';
+var rootDefault = audioEngineDefault == 'soundfont' ? useCMSDDefault ? 66 : 62 : 50; // F-sharp4 for CMSD; legacy D4 for explicit YouTube links
 var presetsDefault = window.self == window.top ? 'HJ8BqlWJb' : ''; // Ethan's landing page; don't use if embedded
 
 window.appInfo = {
@@ -28398,7 +28213,7 @@ window.appInfo = {
             cloneSession: { type: 'bool', inTemplate: false, urlParam: 'clone', inUI: false, default: false },
             configure: { type: 'bool', inTemplate: false, urlParam: 'configure', inUI: false, default: false },
             scoreSlug: { type: 'string', inTemplate: true, urlParam: 'score', inUI: false },
-            scaleSlug: { type: 'string', inTemplate: true, urlParam: 'scale', inUI: true, default: 'minor-pentatonic' },
+            scaleSlug: { type: 'string', inTemplate: true, urlParam: 'scale', inUI: true, default: useCMSDDefault ? 'major-pentatonic' : 'minor-pentatonic' },
             midiRoot: { type: 'int', inTemplate: true, urlParam: 'root', inUI: true, default: rootDefault },
             videoSlug: { type: 'string', inTemplate: true, urlParam: 'video', inUI: true, default: videoDefault },
             soundSlug: { type: 'string', inTemplate: true, urlParam: 'sound', inUI: true, default: soundDefault },

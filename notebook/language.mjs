@@ -6,6 +6,14 @@ const pairs={
 'Waiting for the video. Finish any YouTube ad or press Play to begin.':'正在等待视频。请等待 YouTube 广告结束，或点击播放按钮。',
 'The video did not start. Press Play in the video or replay the melody alone.':'视频未开始。请点击视频中的播放按钮，或单独重听旋律。',
 'Sound could not load. Check your connection or choose another sound.':'无法加载音色。请检查网络，或选择其他音色。','Untitled melody':'未命名旋律','Show or hide video':'显示或隐藏视频',
+'Keep conversation':'保存对话','New conversation':'新对话','You + AI conversation':'你与 AI 的对话','▶ Video':'▶ 视频','Replay conversation':'重听对话',
+'Conversation saved with both voices and pauses.':'已保存对话，包含双方的音符与停顿。','New conversation ready. The previous conversation was saved.':'新对话已准备好，上一段对话已保存。',
+'Conversation limit reached. Keep it, then start a new conversation.':'对话已达到长度限制。请保存后开始新对话。','A conversation sound is unavailable.':'对话中的某个音色暂时不可用。',
+'← Newer':'← 较新','Older →':'较早 →','History and tools':'历史与工具','Melody history':'旋律历史','Saved melodies, newest first':'已保存的旋律，最新的在前',
+'Your turn. The current reply will finish, then AI will wait.':'轮到你了。当前回应结束后，AI 会等待你演奏。','AI will offer a phrase when the current turn finishes.':'当前演奏结束后，AI 会奏出一个乐句。',
+'Starting demos':'入门示例','CMSD piano duet video':'CMSD 钢琴二重奏视频','CMSD · Steve Wogaman · Open video ↗':'CMSD · Steve Wogaman · 打开视频 ↗',
+'CMSD piano duet · Composition and performance by Steve Wogaman.':'CMSD 钢琴二重奏 · 作曲与演奏：Steve Wogaman。','CMSD video could not load. You can still play the instrument.':'无法加载 CMSD 视频，你仍然可以演奏。',
+'Improvise on the black keys with Steve Wogaman. Video streams directly from MusEDLab.':'与 Steve Wogaman 一起用黑键即兴演奏。视频直接由 MusEDLab 提供。','Get on the good foot!':'跟着节奏动起来！',
 'Play':'自由演奏','Play with Video':'跟随视频演奏','Play with AI':'与 AI 合奏','Play mode':'演奏模式',
 'Melody AI':'旋律 AI','Play a phrase, then pause. A musical partner answers.':'演奏一个乐句，稍作停顿，音乐伙伴就会回应。',
 'Who starts?':'谁先开始？','You first':'我先开始','AI first':'AI 先开始','Start AI':'启动 AI','Stop AI':'停止 AI','Reply style':'回应方式',
@@ -63,7 +71,7 @@ function apply(){
  observer.disconnect();document.documentElement.lang=language;
  const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);let node;
  while(node=walker.nextNode()){
-  if(node.parentElement?.closest('script,style,textarea,input,[contenteditable],#language-switch,#keyboardContainer,.app-preset-link'))continue;
+  if(node.parentElement?.closest('script,style,textarea,input,[contenteditable],#language-switch,#keyboardContainer,.app-preset-link strong'))continue;
   const old=originals.get(node),source=old&&node.nodeValue===old.shown?old.source:node.nodeValue,shown=language==='zh-CN'?translate(source):source;
   originals.set(node,{source,shown});if(node.nodeValue!==shown)node.nodeValue=shown;
  }

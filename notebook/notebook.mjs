@@ -1,34 +1,37 @@
 import './language.mjs';
+import {createConversation} from './conversation.mjs';
 import * as TK from './takes.mjs';
 import {initDuet} from './duet.mjs';
 let app,recorder,replay,removed=null,replayId=null,previous=null,liveFrame=0,replayCounts=new Map(),generation=0;
+let renderedFirst=null;
+let conversation,liveDuet=false,playingTake=null,conversationVoices=new Map();
 let replayKeys=new Map(),pitchKeys=new Map(),lastKey=null;
 const $=id=>document.getElementById(id);
 const tool='aqwertyon-preview';
 const status=text=>{$('melody-status').textContent=text;};
 const label=m=>['C','C♯','D','E♭','E','F','F♯','G','A♭','A','B♭','B'][m%12]+(Math.floor(m/12)-1);
 const pitches=events=>[...new Set(events.map(e=>e.midi))].sort((a,b)=>a-b);
-const cfg=()=>({soundSlug:app.options.soundSlug,scaleSlug:app.options.scaleSlug,midiRoot:app.options.midiRoot,layout:app.options.features.layout,volume:app.options.volume});
+const cfg=()=>({soundSlug:app.audioControls.sounds._requestedInstrument||app.options.soundSlug,scaleSlug:app.options.scaleSlug,midiRoot:app.keyboard.mapping.root,layout:app.options.features.layout,transposition:app.keyboard.mapping.transposition,volume:app.options.volume});
 function currentEvents(){const c=recorder.current();return c?c.events.concat([...c.held].map(([code,midi])=>({type:'off',code,midi,t:performance.now()-c.t0}))):[];}
 function drawLive(){const events=currentEvents();TK.drawRoll($('melody-live'),events,{pitches:pitches(events),labels:label});if(recorder.active())liveFrame=requestAnimationFrame(drawLive);}
 function storage(){ $('melody-storage').textContent=TK.storageAvailable()?'Saved in this browser · newest 60 melodies · Export for a backup':'Browser storage unavailable · kept for this visit only · Export for a backup';}
 function render(){
  const host=$('melody-list'),active=document.activeElement;
  const editing=host.contains(active)&&active.matches('input')?{id:active.closest('article').dataset.id,value:active.value,start:active.selectionStart,end:active.selectionEnd}:null;
- host.replaceChildren();const list=TK.list(tool);$('melody-count').textContent=list.length;
+ host.replaceChildren();const list=TK.list(tool);if(list[0]?.id!==renderedFirst)host.scrollLeft=0;renderedFirst=list[0]?.id;$('melody-count').textContent=list.length;
  $('melody-export').disabled=!list.length;$('melody-clear').disabled=!list.length;
  if(!list.length){const p=document.createElement('p');p.textContent='Play two or more notes over at least 0.8 seconds. After you release the keys and pause for 2.5 seconds, your melody appears here.';host.append(p);}
  for(const take of list){
-  const card=document.createElement('article');card.className='melody-card';card.dataset.id=take.id;
+  const card=document.createElement('article');card.className='melody-card';card.dataset.id=take.id;card.classList.toggle('video-take',!!take.media?.id);if(take.media?.id||take.kind==='conversation'){const badge=document.createElement('span');badge.className='take-badge';badge.textContent=take.kind==='conversation'?'You + AI conversation':'▶ Video';card.append(badge);}
   const title=document.createElement('input');title.type='text';title.maxLength=200;title.value=take.title||'';title.placeholder='Untitled melody';title.setAttribute('aria-label','Melody name');title.addEventListener('change',()=>TK.rename(take.id,title.value.trim()));
   const info=document.createElement('p');info.textContent=(take.origin==='ai'?'AI reply · ':'')+`${(take.duration/1000).toFixed(1)} s · ${take.cfg?.scaleSlug||'scale'} · ${take.cfg?.soundSlug?.replaceAll('_',' ')||'sound'}`;
   const canvas=document.createElement('canvas');canvas.height=100;canvas.setAttribute('role','img');canvas.setAttribute('aria-label','Piano roll of '+(take.title||'untitled melody'));
   const controls=document.createElement('div');controls.className='melody-actions';
   const button=(text,fn)=>{const b=document.createElement('button');b.type='button';b.textContent=text;b.onclick=fn;controls.append(b);return b;};
   if(replayId===take.id)button('Stop',()=>stop());
-  else {button('Replay melody',()=>play(take,false));if(take.media?.id)button('With video',()=>play(take,true));}
+  else {button(take.kind==='conversation'?'Replay conversation':'Replay melody',()=>play(take,false));if(take.media?.id)button('With video',()=>play(take,true));}
   button('Delete',()=>{if(replayId===take.id)stop();removed=[take];$('melody-undo').textContent='Undo delete';TK.remove(take.id);$('melody-undo').hidden=false;});
-  card.append(title,info,canvas,controls);host.append(card);requestAnimationFrame(()=>TK.drawRoll(canvas,take.events,{pitches:pitches(take.events),labels:label,duration:take.duration}));
+  card.append(title,info,canvas,controls);host.append(card);requestAnimationFrame(()=>TK.drawRoll(canvas,take.events,{pitches:pitches(take.events),labels:label,duration:take.duration,barFor:(m,b)=>b.voice==='ai'?'#c48527':b.voice==='human'?'#008f98':'#b4442c'}));
  }
  if(editing){const card=[...host.children].find(c=>c.dataset.id===editing.id),input=card?.querySelector('input');if(input){input.value=editing.value;input.focus({preventScroll:true});input.setSelectionRange(editing.start,editing.end);}}
  storage();
@@ -51,7 +54,7 @@ function replayLights(){
 }
 function stop(){
  const keepFocus=$('keyboardContainer').contains(document.activeElement);
- generation++;replay.stop(true);replayCounts.clear();replayKeys.clear();pitchKeys.clear();lastKey=null;replayLights();replayId=null;
+ generation++;replay.stop(true);liveDuet=false;playingTake=null;for(const n of conversationVoices.values())n.stop();conversationVoices.clear();replayCounts.clear();replayKeys.clear();pitchKeys.clear();lastKey=null;replayLights();replayId=null;
  if(previous){
   app.audioControls.switchSound(previous.sound,'soundfont');
   app.rootPicker.root=previous.root;app.scalePicker.scale=previous.scale;
@@ -62,10 +65,10 @@ function stop(){
  status('Ready for your next melody');render();document.dispatchEvent(new CustomEvent('aq:replay-stop'));
  if(keepFocus)$('keyboardContainer').focus({preventScroll:true});
 }
-async function play(take,withVideo){
+async function play(take,withVideo,fromDuet=false){
  const focusOnReplay=$('keyboardContainer').contains(document.activeElement)||!!document.activeElement.closest('.melody-actions');
  app.audioControls.resume();
- document.dispatchEvent(new CustomEvent('aq:replay-start',{detail:{id:take.id}}));
+ document.dispatchEvent(new CustomEvent('aq:replay-start',{detail:{id:take.id,kind:take.kind}}));
  app.releaseNotes();recorder.finish('replay');stop();const run=++generation;
  replayId=take.id;status('Loading melody sound…');render();
  previous={root:app.keyboard.mapping.root,scale:app.scalePicker.scale,layout:app.options.features.layout,transposition:app.keyboard.mapping.transposition,sound:app.options.soundSlug,time:app.video.ready?app.video.player.getCurrentTime():0,playing:app.video.ready&&app.video.player.getPlayerState()===1,withVideo};
@@ -78,6 +81,15 @@ async function play(take,withVideo){
  for(let i=0;i<100;i++){if(run!==generation)return;if(app.audioControls.sounds._currInstrument&&app.audioControls.sounds._requestedInstrument===sound&&app.audioControls.sounds._loadedInstruments[sound]===app.audioControls.sounds._currInstrument)break;await new Promise(r=>setTimeout(r,100));}
  if(run!==generation)return;
  if(app.audioControls.sounds._loadedInstruments[sound]!==app.audioControls.sounds._currInstrument||!app.audioControls.sounds._currInstrument){stop();status('The melody sound could not load. Check your connection and try again.');return;}
+ if(take.kind==='conversation'){
+  const sounds=[...new Set(take.events.filter(e=>e.type==='on').map(e=>e.cfg?.soundSlug||sound))];
+  for(const name of sounds){
+   if(!(name in app.audioControls.sounds._loadedInstruments)){stop();status('A conversation sound is unavailable.');return;}
+   app.audioControls.switchSound(name,'soundfont');
+   for(let i=0;i<100&&!app.audioControls.sounds._loadedInstruments[name];i++){if(run!==generation)return;await new Promise(r=>setTimeout(r,100));}
+   if(run!==generation)return;if(!app.audioControls.sounds._loadedInstruments[name]){stop();status('A conversation sound is unavailable.');return;}
+  }
+ }
  if(withVideo){
   app.video.enabled=true;
   const sameVideo=app.video.ready&&app.video.player.getVideoData&&app.video.player.getVideoData().video_id===take.media.id;
@@ -91,18 +103,37 @@ async function play(take,withVideo){
  }
  else if(app.video.ready)app.video.player.pauseVideo();
  status(withVideo?'Replaying with the video':'Replaying melody');
+ liveDuet=fromDuet;playingTake=take;
  document.dispatchEvent(new CustomEvent('aq:replay-playing',{detail:take}));
- replay.play(take,{onTick(ms){document.dispatchEvent(new CustomEvent('aq:replay-tick',{detail:{id:take.id,ms}}));const c=[...$('melody-list').children].find(c=>c.dataset.id===take.id);if(c)TK.drawRoll(c.querySelector('canvas'),take.events,{pitches:pitches(take.events),labels:label,duration:take.duration,playhead:ms});},onEnd:()=>stop()});
+ replay.play(take,{onTick(ms){document.dispatchEvent(new CustomEvent('aq:replay-tick',{detail:{id:take.id,ms}}));const c=[...$('melody-list').children].find(c=>c.dataset.id===take.id);if(c)TK.drawRoll(c.querySelector('canvas'),take.events,{pitches:pitches(take.events),labels:label,duration:take.duration,playhead:ms,barFor:(m,b)=>b.voice==='ai'?'#c48527':b.voice==='human'?'#008f98':'#b4442c'});},onEnd:()=>stop()});
  if(focusOnReplay)$('keyboardContainer').focus({preventScroll:true});
 }
 function init(){
  if(recorder)return;app=window.appInfo.app;if(!app?.keyboard.keyboardContainer)return;
  const section=document.createElement('details');section.id='melody-notebook';section.open=true;
- section.innerHTML='<summary>Melody Notebook <span id="melody-count">0</span></summary><div class="notebook-body"><p id="melody-status" role="status">Ready for your next melody</p><canvas id="melody-live" height="65" aria-label="Current melody piano roll" role="img"></canvas><p id="melody-storage"></p><p class="melody-note">Captures your played notes and timing, not microphone or video audio. Settings links do not include your melodies.</p><div class="melody-actions"><button id="melody-finish" type="button">Save phrase now</button><button id="melody-export" type="button">Export melodies</button><label class="import-label">Import melodies<input id="melody-import" type="file" accept=".json,application/json"></label><button id="melody-clear" type="button">Clear all</button><button id="melody-undo" type="button" hidden>Undo delete</button></div><div id="melody-list"></div></div>';
+ section.innerHTML='<summary>Melody Notebook <span id="melody-count">0</span></summary><div class="notebook-body"><nav class="melody-tray-nav" aria-label="Melody history"><button id="melody-newer" type="button">← Newer</button><button id="melody-older" type="button">Older →</button><button id="melody-history" type="button" aria-expanded="false">History and tools</button></nav><p id="melody-status" role="status">Ready for your next melody</p><canvas id="melody-live" height="65" aria-label="Current melody piano roll" role="img"></canvas><p id="melody-storage"></p><p class="melody-note">Captures your played notes and timing, not microphone or video audio. Settings links do not include your melodies.</p><div class="melody-actions"><button id="melody-finish" type="button">Save phrase now</button><button id="melody-export" type="button">Export melodies</button><label class="import-label">Import melodies<input id="melody-import" type="file" accept=".json,application/json"></label><button id="melody-clear" type="button">Clear all</button><button id="melody-undo" type="button" hidden>Undo delete</button></div><div id="melody-list" tabindex="0" aria-label="Saved melodies, newest first"></div></div>';
  document.getElementById('main').after(section);$('keyboardContainer').tabIndex=0;
+ conversation=createConversation(cfg,message=>{document.dispatchEvent(new CustomEvent('aq:conversation'));if(message)status(message);});
  recorder=TK.createRecorder({tool,cfg,media:()=>app.video.ready&&app.video.player.getPlayerState()===1?{id:app.video.videoSlug,offset:app.video.player.getCurrentTime()}:null,onStart(){status('Capturing your melody…');cancelAnimationFrame(liveFrame);drawLive();},onEnd(t,reason){cancelAnimationFrame(liveFrame);status(t?'Melody saved':'Play a little longer to keep a melody');render();if(t&&(reason==='gap'||reason==='manual'))document.dispatchEvent(new CustomEvent('aq:phrase',{detail:t}));}});
- replay=TK.createPlayer({noteOn(midi,code){const key=chooseReplayKey(midi,code);if(key)replayKeys.set(code||String(midi),key);const n=replayCounts.get(midi)||0;if(!n)app.audioControls.noteOn(midi);replayCounts.set(midi,n+1);replayLights();},noteOff(midi,code){replayKeys.delete(code||String(midi));const n=Math.max(0,(replayCounts.get(midi)||0)-1);replayCounts.set(midi,n);if(!n)app.audioControls.noteOff(midi);replayLights();}});
- document.addEventListener('aq:note',e=>{if(replayId){if(e.detail.type==='on')stop();return;}const d=e.detail;d.type==='on'?recorder.noteOn(d.midi,d.code):recorder.noteOff(d.midi,d.code);});
+ replay=TK.createPlayer({noteOn(midi,code,event){
+  if(playingTake?.kind==='conversation'){
+   const context=event.cfg||playingTake.cfg;
+   if(Number.isInteger(context.midiRoot)&&context.midiRoot>=0&&context.midiRoot<=127)app.keyboard.mapping.root=context.midiRoot;
+   if(app.scalePicker.isValidScale(context.scaleSlug))app.scalePicker.scale=context.scaleSlug;
+   if(/^(1|3|5|7|8|10|12|14|x)(-(1|3|5|7|8|10|12|14|x)){3}$/.test(context.layout))app.keyboard.mapping.layout=context.layout;
+   app.keyboard.mapping.transposition=Number.isInteger(context.transposition)&&Math.abs(context.transposition)<=120?context.transposition:0;
+   const instrument=app.audioControls.sounds._loadedInstruments[context.soundSlug];
+   if(instrument){instrument.out.gain.value=1;conversationVoices.set(code,instrument.play(midi,undefined,{gain:(event.cfg?.volume??.5)*app.audioControls.sounds._gainBoost}));}
+  }else{const n=replayCounts.get(midi)||0;if(!n)app.audioControls.noteOn(midi);replayCounts.set(midi,n+1);}
+  const key=chooseReplayKey(midi,event.voice==='human'?(event.key||code):code);if(key)replayKeys.set(code||String(midi),key);
+  if(liveDuet)conversation.note('on',midi,code,'ai',cfg());replayLights();
+ },noteOff(midi,code){
+  replayKeys.delete(code||String(midi));
+  if(conversationVoices.has(code)){conversationVoices.get(code).stop();conversationVoices.delete(code);}
+  else{const n=Math.max(0,(replayCounts.get(midi)||0)-1);replayCounts.set(midi,n);if(!n)app.audioControls.noteOff(midi);}
+  if(liveDuet)conversation.note('off',midi,code,'ai');replayLights();
+ }});
+ document.addEventListener('aq:note',e=>{if(replayId){if(e.detail.type==='on')stop();else return;}const d=e.detail;conversation.note(d.type,d.midi,d.code,'human',cfg());d.type==='on'?recorder.noteOn(d.midi,d.code):recorder.noteOff(d.midi,d.code);});
  document.addEventListener('aq:configuration',()=>{app.releaseNotes();recorder.finish();if(replayId)stop();});
  document.addEventListener('aq:takes',render);
  document.addEventListener('focusin',e=>{if(e.target.matches('input,textarea,select')||e.target.isContentEditable)app.releaseNotes();});
@@ -116,6 +147,9 @@ function init(){
  $('melody-undo').onclick=()=>{if(removed){TK.restoreCleared(removed);removed=null;status('Saved melodies restored');}$('melody-undo').hidden=true;};
  section.addEventListener('toggle',()=>{if(section.open)render();else if(replayId)stop();});
  window.addEventListener('resize',render);render();
- window.aqNotebook={recorder,replay,play,stop,TK};initDuet(app);
+ $('melody-newer').onclick=()=>$('melody-list').scrollBy({left:-300,behavior:'smooth'});
+ $('melody-older').onclick=()=>$('melody-list').scrollBy({left:300,behavior:'smooth'});
+ $('melody-history').onclick=()=>{const on=section.classList.toggle('show-history');$('melody-history').setAttribute('aria-expanded',String(on));};
+ window.aqNotebook={recorder,replay,play,stop,TK,conversation};initDuet(app);
 }
 document.addEventListener('aq:ready',()=>setTimeout(init,0));if(window.appInfo?.app)setTimeout(init,0);

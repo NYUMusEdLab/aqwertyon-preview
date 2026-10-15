@@ -16,7 +16,7 @@ const pairs={
 'Improvise on the black keys with Steve Wogaman. Video streams directly from MusEDLab.':'与 Steve Wogaman 一起用黑键即兴演奏。视频直接由 MusEDLab 提供。','Get on the good foot!':'跟着节奏动起来！',
 'Play':'自由演奏','Play with Video':'跟随视频演奏','Play with AI':'与 AI 合奏','Play mode':'演奏模式',
 'Melody AI':'旋律 AI','Play a phrase, then pause. A musical partner answers.':'演奏一个乐句，稍作停顿，音乐伙伴就会回应。',
-'You':'你','AI':'AI','Who starts?':'谁先开始？','You first':'我先开始','AI first':'AI 先开始','Start AI':'启动 AI','Stop AI':'停止 AI','Reply style':'回应方式',
+'About & credits':'关于与致谢','AI credits and licenses':'AI 致谢与许可','You':'你','AI':'AI','Who starts?':'谁先开始？','You first':'我先开始','AI first':'AI 先开始','Start AI':'启动 AI','Stop AI':'停止 AI','Reply style':'回应方式',
 'Echo':'模仿','Extend':'续奏','Contrast':'对比','Complement':'互补','Harmonize':'和声',
 'Repeat your notes, chords and timing exactly.':'按原样重复你的音符、和弦和节奏。',
 'Recall the end of your phrase, then continue with new model-generated notes.':'呼应乐句的结尾，再用模型生成的新旋律接着演奏。',

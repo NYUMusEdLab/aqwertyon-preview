@@ -19,3 +19,8 @@ header #logo1{position:static;flex-shrink:0;height:50px;background-size:110px au
 .duet-panel canvas {display:block;width:100%;height:110px;background:#fff;border-radius:4px;}
 .duet-panel .duet-credit {font-size:11px;}
 .duet-panel .duet-credit a {color:#245b6b;}
+
+.duet-panel #duet-roll {height:300px;}
+.duet-legend {display:flex;justify-content:space-between;}
+.duet-legend span:first-child {color:#007880;}
+.duet-legend span:last-child {color:#925500;}

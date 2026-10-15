@@ -1,6 +1,7 @@
 import * as TK from './takes.mjs';
 import {initDuet} from './duet.mjs';
 let app,recorder,replay,removed=null,replayId=null,previous=null,liveFrame=0,replayCounts=new Map(),generation=0;
+let replayKeys=new Map(),pitchKeys=new Map(),lastKey=null;
 const $=id=>document.getElementById(id);
 const tool='aqwertyon-preview';
 const status=text=>{$('melody-status').textContent=text;};
@@ -28,14 +29,24 @@ function render(){
  }
  storage();
 }
+function chooseReplayKey(midi,code){
+ const buttons=app.keyboard.buttons._buttonsByName;
+ const matches=b=>b&&b.eventType==='midi'&&!b.disabled&&b.eventData===midi;
+ if(matches(buttons[code]))return buttons[code];
+ if(matches(pitchKeys.get(midi)))return pitchKeys.get(midi);
+ const candidates=Object.entries(buttons).filter(([,b])=>matches(b));
+ const position=name=>String(name).split('-').map(Number);
+ const previous=lastKey?position(lastKey.name):[0,0];
+ const score=([name])=>{const [x,y]=position(name);return Math.abs(y-previous[1])*4+Math.abs(x-previous[0]);};
+ candidates.sort((a,b)=>score(a)-score(b));
+ const chosen=candidates[0]?.[1];if(chosen){pitchKeys.set(midi,chosen);lastKey=chosen;}return chosen;
+}
 function replayLights(){
- for(const b of Object.values(app.keyboard.buttons._buttonsByName)){
-  const lit=b.eventType==='midi'&&!b.disabled&&(replayCounts.get(b.eventData)||0)>0;
-  b.classList.toggle('notebook-playing',lit);
- }
+ const active=new Set(replayKeys.values());
+ for(const b of Object.values(app.keyboard.buttons._buttonsByName))b.classList.toggle('notebook-playing',active.has(b));
 }
 function stop(){
- generation++;replay.stop(true);replayCounts.clear();replayLights();replayId=null;
+ generation++;replay.stop(true);replayCounts.clear();replayKeys.clear();pitchKeys.clear();lastKey=null;replayLights();replayId=null;
  if(previous){
   app.audioControls.switchSound(previous.sound,'soundfont');
   app.rootPicker.root=previous.root;app.scalePicker.scale=previous.scale;
@@ -73,6 +84,7 @@ async function play(take,withVideo){
  }
  else if(app.video.ready)app.video.player.pauseVideo();
  status(withVideo?'Replaying with the video':'Replaying melody');
+ document.dispatchEvent(new CustomEvent('aq:replay-playing',{detail:take}));
  replay.play(take,{onTick(ms){document.dispatchEvent(new CustomEvent('aq:replay-tick',{detail:{id:take.id,ms}}));const c=[...$('melody-list').children].find(c=>c.dataset.id===take.id);if(c)TK.drawRoll(c.querySelector('canvas'),take.events,{pitches:pitches(take.events),labels:label,duration:take.duration,playhead:ms});},onEnd:()=>stop()});
  $('keyboardContainer').focus({preventScroll:true});
 }
@@ -82,7 +94,7 @@ function init(){
  section.innerHTML='<summary>Melody Notebook <span id="melody-count">0</span></summary><div class="notebook-body"><p id="melody-status" role="status">Ready for your next melody</p><canvas id="melody-live" height="65" aria-label="Current melody piano roll" role="img"></canvas><p id="melody-storage"></p><p class="melody-note">Captures your played notes and timing, not microphone or video audio. Settings links do not include your melodies.</p><div class="melody-actions"><button id="melody-finish" type="button">Save phrase now</button><button id="melody-export" type="button">Export melodies</button><label class="import-label">Import melodies<input id="melody-import" type="file" accept=".json,application/json"></label><button id="melody-undo" type="button" hidden>Undo delete</button></div><div id="melody-list"></div></div>';
  document.getElementById('main').after(section);$('keyboardContainer').tabIndex=0;
  recorder=TK.createRecorder({tool,cfg,media:()=>app.video.ready&&app.video.player.getPlayerState()===1?{id:app.video.videoSlug,offset:app.video.player.getCurrentTime()}:null,onStart(){status('Capturing your melody…');cancelAnimationFrame(liveFrame);drawLive();},onEnd(t,reason){cancelAnimationFrame(liveFrame);status(t?'Melody saved':'Play a little longer to keep a melody');render();if(t&&(reason==='gap'||reason==='manual'))document.dispatchEvent(new CustomEvent('aq:phrase',{detail:t}));}});
- replay=TK.createPlayer({noteOn(midi){const n=replayCounts.get(midi)||0;if(!n)app.audioControls.noteOn(midi);replayCounts.set(midi,n+1);replayLights();},noteOff(midi){const n=Math.max(0,(replayCounts.get(midi)||0)-1);replayCounts.set(midi,n);if(!n)app.audioControls.noteOff(midi);replayLights();}});
+ replay=TK.createPlayer({noteOn(midi,code){const key=chooseReplayKey(midi,code);if(key)replayKeys.set(code||String(midi),key);const n=replayCounts.get(midi)||0;if(!n)app.audioControls.noteOn(midi);replayCounts.set(midi,n+1);replayLights();},noteOff(midi,code){replayKeys.delete(code||String(midi));const n=Math.max(0,(replayCounts.get(midi)||0)-1);replayCounts.set(midi,n);if(!n)app.audioControls.noteOff(midi);replayLights();}});
  document.addEventListener('aq:note',e=>{if(replayId){if(e.detail.type==='on')stop();return;}const d=e.detail;d.type==='on'?recorder.noteOn(d.midi,d.code):recorder.noteOff(d.midi,d.code);});
  document.addEventListener('aq:configuration',()=>{app.releaseNotes();recorder.finish();if(replayId)stop();});
  document.addEventListener('aq:takes',render);

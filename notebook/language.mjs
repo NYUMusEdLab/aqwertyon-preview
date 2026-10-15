@@ -8,7 +8,7 @@ const pairs={
 'Waiting for the video. Finish any YouTube ad or press Play to begin.':'正在等待视频。请等待 YouTube 广告结束，或点击播放按钮。',
 'The video did not start. Press Play in the video or replay the melody alone.':'视频未开始。请点击视频中的播放按钮，或单独重听旋律。',
 'Sound could not load. Check your connection or choose another sound.':'无法加载音色。请检查网络，或选择其他音色。','Untitled melody':'未命名旋律','Show or hide video':'显示或隐藏视频',
-'Keep conversation':'保存对话','New conversation':'新对话','You + AI conversation':'你与 AI 的对话','▶ Video':'▶ 视频','Replay conversation':'重听对话',
+'♪ Play':'♪ 自由演奏','✦ AI conversation':'✦ AI 对话','✦ AI reply':'✦ AI 回应','Keep conversation':'保存对话','New conversation':'新对话','You + AI conversation':'你与 AI 的对话','▶ Video':'▶ 视频','Replay conversation':'重听对话',
 'Conversation saved with both voices and pauses.':'已保存对话，包含双方的音符与停顿。','New conversation ready. The previous conversation was saved.':'新对话已准备好，上一段对话已保存。',
 'Conversation limit reached. Keep it, then start a new conversation.':'对话已达到长度限制。请保存后开始新对话。','A conversation sound is unavailable.':'对话中的某个音色暂时不可用。',
 '← Newer':'← 较新','Older →':'较早 →','History and tools':'历史与工具','Melody history':'旋律历史','Saved melodies, newest first':'已保存的旋律，最新的在前',
@@ -59,6 +59,9 @@ const pairs={
 'Choose a JSON file smaller than 5 MB.':'请选择小于 5 MB 的 JSON 文件。','Use a melody JSON file smaller than 5 MB.':'请使用小于 5 MB 的旋律 JSON 文件。','Choose an aQWERTYon melody export.':'请选择 aQWERTYon 导出的旋律文件。','Too many melodies in this file.':'此文件中的旋律数量过多。','Invalid piano take':'旋律数据无效','not a takes file':'这不是旋律文件'
 };
 let language='en';try{language=localStorage.getItem('aqwertyon.language')==='zh-CN'?'zh-CN':'en';}catch(_){}
+// Explicit launcher language wins over the saved preference for this visit.
+const launcherLanguage=new URLSearchParams(location.search).get('lang');
+if(['en','zh','zh-CN','zh-Hans'].includes(launcherLanguage)){language=launcherLanguage==='en'?'en':'zh-CN';try{localStorage.setItem('aqwertyon.language',language);}catch(_){}}
 const originals=new WeakMap(),attrs=new WeakMap();
 function translate(text){
  const trimmed=text.trim();if(pairs[trimmed])return text.replace(trimmed,pairs[trimmed]);
@@ -85,7 +88,11 @@ function apply(){
  observer.observe(document.body,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['aria-label','aria-description','placeholder','title']});
 }
 let queued=false;const observer=new MutationObserver(()=>{if(!queued){queued=true;queueMicrotask(()=>{queued=false;apply();});}});
-const control=document.createElement('div');control.id='language-switch';control.setAttribute('role','group');control.setAttribute('aria-label','Language / 语言');control.innerHTML='<button type="button" data-language="en">English</button><button type="button" data-language="zh-CN">简体中文</button>';
+const control=document.createElement('div');control.id='language-switch';control.setAttribute('role','group');control.setAttribute('aria-label','Language / 语言');control.innerHTML='<button type="button" data-language="en">English</button><button type="button" data-language="zh-CN">中文</button>';
 document.querySelector('header').append(control);
-control.addEventListener('click',e=>{const value=e.target.dataset.language;if(!value)return;language=value;try{localStorage.setItem('aqwertyon.language',value);}catch(_){}apply();document.dispatchEvent(new CustomEvent('aq:language',{detail:{language}}));});
+let priorFocus=null,pointerLanguage=false;
+control.addEventListener('pointerdown',e=>{priorFocus=document.activeElement;pointerLanguage=true;if(e.button===0)e.preventDefault();});
+control.addEventListener('keydown',()=>{pointerLanguage=false;});
+control.addEventListener('pointercancel',()=>{pointerLanguage=false;});
+control.addEventListener('click',e=>{const value=e.target.dataset.language;if(!value)return;language=value;try{localStorage.setItem('aqwertyon.language',value);}catch(_){}apply();document.dispatchEvent(new CustomEvent('aq:language',{detail:{language}}));if(pointerLanguage&&priorFocus?.isConnected)priorFocus.focus({preventScroll:true});pointerLanguage=false;});
 apply();

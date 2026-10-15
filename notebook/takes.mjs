@@ -91,7 +91,7 @@ export function importJSON(text) {
    or fewer than `minNotes` note-ons and it is discarded, like the
    Playground's one-second rule. */
 export function createRecorder(opts) {
-  const o = Object.assign({ tool: 'aqwertyon-preview', gap: 2500, maxLen: 90000, minLen: 800, minNotes: 2, cfg: () => ({}), media: () => null, onStart: () => {}, onEnd: () => {}, onEvent: () => {} }, opts);
+  const o = Object.assign({ tool: 'aqwertyon-preview', gap: 2500, maxLen: 90000, minLen: 800, minNotes: 2, cfg: () => ({}), media: () => null, onStart: () => {}, onEnd: () => {}, onEvent: () => {}, shouldSave: () => true }, opts);
   let cur = null;          /* { t0, events, held:Set, timer } */
   let idCount = 0;
 
@@ -117,7 +117,7 @@ export function createRecorder(opts) {
       tool: o.tool, ts: Date.now(), title: '', cfg: take.cfg, media: take.media,
       duration, events: take.events
     };
-    save(rec);
+    if(o.shouldSave(rec))save(rec);
     o.onEnd(rec, reason);
   }
   return {

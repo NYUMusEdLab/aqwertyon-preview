@@ -27485,7 +27485,7 @@ module.exports={
         "videoSlug": "R7iNSUoQ4Lk",
         "scaleSlug": "minor-pentatonic",
         "scoreSlug": null,
-        "soundSlug": "rock_organ"
+        "soundSlug": "flute"
       },
       "version": 1
     }
@@ -27754,7 +27754,7 @@ PresetPicker.prototype.selectPreset = function (index, hide) {
   // All presets start from complete defaults, so missing fields cannot leak from another preset.
   var o = JSON.parse(JSON.stringify(p.options));
   var features = Object.assign({ layout: '1-3-5-8', scaleControls: true, allControls: true, audioEngine: 'soundfont', showVideo: true, showScore: false, showSounds: true, showKeyboard: true, useNoteCaps: true }, o.features);
-  this.app.configManager.onReload(Object.assign({ volume: .5, soundSlug: 'rock_organ', scaleSlug: 'minor-pentatonic', midiRoot: 62, scoreSlug: null }, o, { features: features }));
+  this.app.configManager.onReload(Object.assign({ volume: .5, soundSlug: 'flute', scaleSlug: 'minor-pentatonic', midiRoot: 62, scoreSlug: null }, o, { features: features }));
   this.currentIndex = index;this.showPresetsButton.textContent = p.name + ' · Presets';
   if (hide) this.toggleVisibility(false);
 };
@@ -28213,7 +28213,7 @@ if (Aqwertyon.prototype.isLocal) {
 var sharedVideo = new URLSearchParams(location.search).get('video');
 var useCMSDDefault = !sharedVideo || sharedVideo === 'cmsd';
 var videoDefault = 'cmsd'; // Existing MusEDLab-hosted CMSD piano duet
-var soundDefault = audioEngineDefault == 'soundfont' ? useCMSDDefault ? 'flute' : 'rock_organ' : 'bessie';
+var soundDefault = audioEngineDefault == 'soundfont' ? 'flute' : 'bessie';
 var rootDefault = audioEngineDefault == 'soundfont' ? useCMSDDefault ? 66 : 62 : 50; // F-sharp4 for CMSD; legacy D4 for explicit YouTube links
 var presetsDefault = window.self == window.top ? 'HJ8BqlWJb' : ''; // Ethan's landing page; don't use if embedded
 
@@ -30167,7 +30167,7 @@ Keyboard.prototype = {
         var label = document.createElement('span');label.textContent = 'Key labels';label.id = 'keyboard-labels-heading';
         this.noteCapToggle.appendChild(label);
         this._labelSelect = document.createElement('div');this._labelSelect.id = 'keyboard-labels';this._labelSelect.setAttribute('role', 'group');this._labelSelect.setAttribute('aria-labelledby', 'keyboard-labels-heading');this._labelSelect.title = 'Jianpu: 1 is the selected root; dots above or below mark higher or lower octaves.';
-        this._labelSelect.innerHTML = '<button type="button" data-label="keys" aria-pressed="false">Key Names</button><button type="button" data-label="western" aria-pressed="false">Note Names</button><button type="button" data-label="jianpu" aria-pressed="false">Jianpu</button>';
+        this._labelSelect.innerHTML = '<button type="button" data-label="keys" aria-pressed="false">Keys</button><button type="button" data-label="western" aria-pressed="false">Notes</button><button type="button" data-label="jianpu" aria-pressed="false">Jianpu</button>';
         this.noteCapToggle.appendChild(this._labelSelect);
         var pointerLabelChoice = false;
         this._labelSelect.addEventListener('pointerdown', function (e) {
@@ -30232,7 +30232,7 @@ Keyboard.prototype = {
                 return b.setAttribute('aria-pressed', String(b.dataset.label === _this3._labelMode));
             });
         }
-        if (this._useCustomLabels) this.mapping.updateNoteLabels();else if (this._keyTemplate) this.buttons.applyTemplate(this._keyTemplate);
+        this.mapping.updateNoteLabels();
     },
 
     /**
@@ -30493,25 +30493,32 @@ KeyMapper.prototype = {
     },
 
     updateNoteLabels: function updateNoteLabels() {
-        // Only change the labels if use custom labels is true. Otherwise ignore
-        if (this._parent.useCustomLabels) {
-            for (var i = 0; i < 4; ++i) {
-                if (this._layout[i]) {
-                    for (var j = 0; j < 13; ++j) {
-                        var button = this._parent.buttons.getButtonByName(j + '-' + i);
-                        if (button) {
-                            if (this._parent.labelMode === 'jianpu') {
-                                var delta = button.eventData - this._root,
-                                    pc = (delta % 12 + 12) % 12,
-                                    octave = Math.floor(delta / 12);
-                                var names = ['1', '♭2', '2', '♭3', '3', '4', '♯4', '5', '♭6', '6', '♭7', '7'];
-                                button.label = names[pc] + (octave > 0 ? '\u0307'.repeat(octave) : '\u0323'.repeat(-octave));
-                            } else button.label = Theory.nameForNote(button.eventData, this._root, this._pitchSet);
-                        }
-                    }
-                }
-            }
-        }
+        var _this = this;
+
+        var mode = this._parent.labelMode;
+        var definitions = {};(this._parent._keyTemplate || []).forEach(function (row) {
+            return row.forEach(function (k) {
+                if (k.name) definitions[k.name] = k.label;
+            });
+        });
+        Object.keys(this._parent.buttons._buttonsByName).forEach(function (name) {
+            var b = _this._parent.buttons._buttonsByName[name];
+            if (b.eventType !== 'midi' || !Number.isInteger(b.eventData)) return;
+            var note = Theory.nameForNote(b.eventData, _this._root, _this._pitchSet),
+                key = definitions[name] || '';
+            if (mode === 'jianpu') {
+                var delta = b.eventData - _this._root,
+                    pc = (delta % 12 + 12) % 12,
+                    octave = Math.floor(delta / 12);
+                b.label = ['1', '♭2', '2', '♭3', '3', '4', '♯4', '5', '♭6', '6', '♭7', '7'][pc] + (octave > 0 ? '\u0307'.repeat(octave) : '\u0323'.repeat(-octave));
+            } else b.label = mode === 'keys' ? key : note;
+            var plain = document.createElement('span');plain.innerHTML = note;
+            b._domNode.dataset.secondary = mode === 'keys' ? plain.textContent : key;
+            var primary = document.createElement('span');primary.className = 'key-main';while (b._domNode.firstChild) {
+                primary.appendChild(b._domNode.firstChild);
+            }b._domNode.appendChild(primary);
+            b._domNode.classList.add('theory-key');
+        });
     }
 };
 

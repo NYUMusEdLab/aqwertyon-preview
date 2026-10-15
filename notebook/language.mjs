@@ -1,5 +1,6 @@
 // UI translation only. Never rewrites input values, saved titles, musical data or URLs.
 const pairs={
+'Explore notes':'探索音符','Off':'关闭','Scale wheel':'音阶轮','Staff':'五线谱','Pitch order':'音高排列','Circle of Fifths':'五度圈','Live pitches in the selected scale':'所选音阶的实时音高','Play notes to see their pitches.':'演奏音符以查看音高。',
 'Replaying melody':'正在重听旋律','Replaying with the video':'正在跟随视频重听',
 'The melody sound could not load. Check your connection and try again.':'无法加载旋律音色。请检查网络后重试。',
 'The video could not load. Replay the melody alone or try again.':'无法加载视频。可以单独重听旋律，或再试一次。',
@@ -45,7 +46,7 @@ const pairs={
 'Current melody piano roll':'当前旋律的钢琴卷帘图','Musical keyboard':'演奏键盘',
 'Click or tap a key to play. When this keyboard has focus, use the letter keys to play. Tab moves to the next control.':'点击或触摸琴键即可演奏。此键盘获得焦点后，可使用字母键演奏。按 Tab 移至下一个控件。',
 'Live duet: pitch from left to right; notes rise with time. Human notes are teal and AI notes amber.':'实时合奏：音高从左向右排列，音符随时间向上移动。你的音符为青色，AI 的音符为琥珀色。',
-'Key labels':'键盘标记','Key Names':'键位名称','Note Names':'音名','Jianpu':'简谱','Sound':'音色','Vol':'音量','Root':'主音','Scale':'音阶','Scale Type':'音阶类型','Scale type':'音阶类型',
+'Key labels':'键盘标记','Key Names':'键位名称','Note Names':'音名','Keys':'键位名称','Notes':'音名','Jianpu':'简谱','Sound':'音色','Vol':'音量','Root':'主音','Scale':'音阶','Scale Type':'音阶类型','Scale type':'音阶类型',
 'Jianpu: 1 is the selected root; dots above or below mark higher or lower octaves.':'简谱中，1 为所选主音；数字上方或下方的点表示升高或降低八度。',
 'Major':'大调','Minor':'小调','Minor Pentatonic':'小调五声音阶','Major Pentatonic':'大调五声音阶','Pentatonic':'五声音阶','Chromatic':'半音阶','Whole Tone':'全音阶','Blues':'布鲁斯','Dorian':'多利亚调式','Mixolydian':'混合利底亚调式',
 'Share:':'分享：','Share instrument settings':'分享乐器设置','Select a preset':'选择预设','aQWERTYon · Preview with Melody Notebook':'aQWERTYon · 旋律笔记本预览版',

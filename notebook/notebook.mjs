@@ -2,6 +2,7 @@ import './language.mjs';
 import {conversationChunks} from './conversation-chunks.mjs';
 import {createConversation} from './conversation.mjs';
 import * as TK from './takes.mjs';
+import {initNoteViews} from './note-views.mjs';
 import {initDuet} from './duet.mjs';
 let app,recorder,replay,removed=null,replayId=null,previous=null,liveFrame=0,replayCounts=new Map(),generation=0;
 let renderedFirst=null,undoSession=null;
@@ -79,7 +80,7 @@ async function play(take,withVideo,fromDuet=false){
  app.scalePicker.scale=app.scalePicker.isValidScale(take.cfg?.scaleSlug)?take.cfg.scaleSlug:previous.scale;
  app.keyboard.mapping.layout=/^(1|3|5|7|8|10|12|14|x)(-(1|3|5|7|8|10|12|14|x)){3}$/.test(take.cfg?.layout)?take.cfg.layout:previous.layout;
  app.keyboard.mapping.transposition=0;
- const sound=take.cfg?.soundSlug||'rock_organ';app.audioControls.switchSound(sound,'soundfont');
+ const sound=take.cfg?.soundSlug||'flute';app.audioControls.switchSound(sound,'soundfont');
  for(let i=0;i<100;i++){if(run!==generation)return;if(app.audioControls.sounds._currInstrument&&app.audioControls.sounds._requestedInstrument===sound&&app.audioControls.sounds._loadedInstruments[sound]===app.audioControls.sounds._currInstrument)break;await new Promise(r=>setTimeout(r,100));}
  if(run!==generation)return;
  if(app.audioControls.sounds._loadedInstruments[sound]!==app.audioControls.sounds._currInstrument||!app.audioControls.sounds._currInstrument){stop();status('The melody sound could not load. Check your connection and try again.');return;}
@@ -153,6 +154,6 @@ function init(){
  $('melody-newer').onclick=()=>$('melody-list').scrollBy({left:-300,behavior:'smooth'});
  $('melody-older').onclick=()=>$('melody-list').scrollBy({left:300,behavior:'smooth'});
  $('melody-history').onclick=()=>{const on=section.classList.toggle('show-history');$('melody-history').setAttribute('aria-expanded',String(on));};
- window.aqNotebook={recorder,replay,play,stop,TK,conversation};initDuet(app);
+ window.aqNotebook={recorder,replay,play,stop,TK,conversation};initDuet(app);initNoteViews(app);
 }
 document.addEventListener('aq:ready',()=>setTimeout(init,0));if(window.appInfo?.app)setTimeout(init,0);

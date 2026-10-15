@@ -84,3 +84,13 @@ export function styledReply(take,prompt,generated,allowed,style){
  }else return base;
  return make(events);
 }
+
+// An explicit local echo keeps the interaction going after three silent model samples.
+export function audibleReply(take,prompt,generated,allowed,style,opening=false){
+ if(!(generated.notes||[]).some(n=>Number.isFinite(n.pitch))){
+  const reply=styledReply(take,null,null,allowed,'echo');
+  reply.title='Echo · model returned silence';reply.generationFallback='model-silence';
+  reply.requestedStyle=style;return reply;
+ }
+ return opening?shapeReply(take,prompt,generated,allowed,'explore'):styledReply(take,prompt,generated,allowed,style);
+}

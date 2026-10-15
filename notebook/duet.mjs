@@ -1,6 +1,6 @@
 import {createAccompaniment} from './accompaniment.mjs';
 import * as TK from './takes.mjs';
-import {preparePrompt,shapeReply,styledReply,replyStyles} from './ai/music.mjs';
+import {preparePrompt,shapeReply,styledReply,replyStyles,audibleReply} from './ai/music.mjs';
 import {createVerticalRoll} from './vertical-roll.mjs';
 export function initDuet(app){
  const box=app.video.container;
@@ -16,6 +16,13 @@ export function initDuet(app){
  const summary=document.createElement('summary');summary.textContent='Options';options.append(summary);
  options.append(find('duet-first').parentElement,find('duet-style-help'),find('backing-controls'),find('duet-new-conversation'),find('duet-keep'));
  panel.append(options);
+ const moreStyles=document.createElement('details');moreStyles.className='duet-more-styles';
+ moreStyles.innerHTML='<summary>More styles</summary><div class="duet-extra-styles"></div>';
+ ['complement','harmonize','accompaniment'].forEach(value=>moreStyles.lastElementChild.append(find('duet-style').querySelector('[data-value="'+value+'"]')));
+ find('duet-style').append(moreStyles);
+ options.append(find('duet-conversation'));find('duet-conversation').hidden=true;find('duet-keep').hidden=true;
+ const savedHint=document.createElement('p');savedHint.className='duet-save-hint';savedHint.textContent='Replies and conversations save automatically.';find('duet-roll').after(savedHint);
+
  const contrastingSound=()=>((app.audioControls.sounds._requestedInstrument||app.options.soundSlug)==='acoustic_grand_piano'?'vibraphone':'acoustic_grand_piano');
 
  function toggleGroup(id,initial){
@@ -30,7 +37,7 @@ export function initDuet(app){
  }
  toggleGroup('duet-first','ai');toggleGroup('duet-style','extend');
  find('duet-style-help').textContent=replyStyles[find('duet-style').value];
- find('duet-style').onchange=()=>{epoch++;backingEpoch++;queuedTake=null;backing.stop();window.aqNotebook.stop();opening=false;clearTimeout(openingTimer);const on=isBacking();lastReply=null;find('duet-keep').disabled=true;find('duet-keep').hidden=on;panel.querySelector('h3+p').textContent=on?'Play your melody while the backing continues.':'Play a phrase, then pause. A musical partner answers.';find('backing-controls').hidden=!on;find('duet-first').parentElement.hidden=on;find('duet-style-help').textContent=on?'Play freely over continuous backing. Changes land on the next beat.':replyStyles[find('duet-style').value];if(on)options.open=true;if(on&&enabled&&ready)refreshBacking();};
+ find('duet-style').onchange=()=>{epoch++;backingEpoch++;queuedTake=null;backing.stop();window.aqNotebook.stop();opening=false;clearTimeout(openingTimer);const on=isBacking();lastReply=null;find('duet-keep').disabled=true;find('duet-keep').hidden=true;panel.querySelector('h3+p').textContent=on?'Play your melody while the backing continues.':'Play a phrase, then pause. A musical partner answers.';find('backing-controls').hidden=!on;find('duet-first').parentElement.hidden=on;find('duet-style-help').textContent=on?'Play freely over continuous backing. Changes land on the next beat.':replyStyles[find('duet-style').value];if(on)options.open=true;if(on&&enabled&&ready)refreshBacking();};
  let workerStarts=0;
  let enabled=false,worker=null,ready=false,serial=0,pending=new Map(),epoch=0,lastReply=null,lastPrompt=null,thinking=false,queuedTake=null;
  let opening=false,openingTimer=null;const humanHeld=new Set();
@@ -51,8 +58,9 @@ export function initDuet(app){
    take=take||{id:'backing-seed',duration:1600,cfg:{midiRoot:app.options.midiRoot},events:[0,400,800,1200].flatMap((t,i)=>[{type:'on',midi:root,code:'seed'+i,t},{type:'off',midi:root,code:'seed'+i,t:t+300}])};
    const prompt=preparePrompt(take),out=await request({type:'reply',sequence:prompt.sequence,steps:prompt.steps,temperature:.85});
    if(token!==backingEpoch||!enabled||!isBacking())return;
-   const shaped=shapeReply(take,prompt,out.sequence,range(),'explore'),notes=shaped.events.filter(e=>e.type==='on').map(e=>e.midi);
+   const shaped=audibleReply(take,prompt,out.sequence,range(),'extend',true),notes=shaped.events.filter(e=>e.type==='on').map(e=>e.midi);
    const sound=contrastingSound(),instrument=await app.audioControls.sounds.createBackingInstrument(sound);if(token!==backingEpoch||!enabled||!isBacking())return;
+   shaped.cfg={...shaped.cfg,soundSlug:sound,midiRoot:app.options.midiRoot,scaleSlug:app.options.scaleSlug,layout:app.options.features.layout,volume:Number(find('backing-volume').value)};shaped.title=shaped.generationFallback?'Backing echo · model returned silence':'AI backing motif';TK.save(shaped);
    updateBacking();if(backing.state().active&&backingSound===sound)backing.motif(notes);else{backing.stop();backingSound=sound;backing.start(instrument,notes);}
    status('Backing is playing. Your melody stays independent; changes apply on the beat.');
   }catch(error){if(token===backingEpoch&&enabled)status('Backing could not load. Stop and start AI to retry.');}
@@ -126,12 +134,13 @@ export function initDuet(app){
     const prompt=preparePrompt(take);
     const out=await request({type:'reply',sequence:prompt.sequence,steps:prompt.steps,temperature:style==='contrast'?1.05:0.8});
     if(run!==epoch||!enabled)return;
-    lastReply=isOpening?shapeReply(take,prompt,out.sequence,allowed,'explore'):styledReply(take,prompt,out.sequence,allowed,style);
+    lastReply=audibleReply(take,prompt,out.sequence,allowed,style,isOpening);lastReply.modelAttempts=out.attempts;
    }
-   if(isOpening){lastReply.title='AI opening';delete lastReply.parentTakeId;}
+   if(isOpening){if(!lastReply.generationFallback)lastReply.title='AI opening';delete lastReply.parentTakeId;}
    lastReply.cfg={...lastReply.cfg,soundSlug:contrastingSound()};
+   TK.save(lastReply); // Keep the full generated phrase even when the user interrupts playback.
    find('duet-keep').disabled=false;
-   status('AI’s turn. Play a note whenever you want to take over.');
+   status(lastReply.generationFallback?'The model was silent; playing a local echo instead.':'AI’s turn. Play a note whenever you want to take over.');
    await window.aqNotebook.play(lastReply,false,true);
   }catch(e){if(run===epoch&&enabled)status(e.message);}
   finally{thinking=false;if(enabled&&opening&&!queuedTake&&!window.aqNotebook.replay.playing())waitForHuman();if(enabled&&queuedTake){const next=queuedTake;queuedTake=null;document.dispatchEvent(new CustomEvent('aq:phrase',{detail:next}));}}

@@ -226,3 +226,7 @@ header #session{gap:8px;font-size:14px;line-height:1.2;min-width:0}header #share
 
 /* Mode labels complement pastel colors so archives remain distinguishable without color. */
 #melody-list>.melody-card.play-take{background:#f1f6e9;border-color:#c4d2b6}#melody-list>.melody-card.video-take{background:#edf3fc;border-color:#b8cce5}#melody-list>.melody-card.ai-take{background:#f5eefb;border-color:#d4c1e6}.play-take .take-badge{color:#3d603c}.video-take .take-badge{color:#345d88}.ai-take .take-badge{color:#704995}
+
+.duet-more-styles{grid-column:1/-1}.duet-more-styles summary{font-size:12px;cursor:pointer;padding:6px 0}.duet-extra-styles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}.duet-panel .duet-save-hint{font-size:11px;margin:5px 0;color:#526561}.duet-panel>.conversation-actions:empty{display:none}@media(pointer:coarse),(max-width:1099px){.duet-more-styles summary{min-height:44px;display:flex;align-items:center}}
+/* Three short primary choices; secondary styles remain disclosed below. */
+.duet-panel #duet-style{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}.duet-panel #duet-style button{font-size:12px;padding:7px 3px}.duet-panel>.conversation-actions:empty{display:none}.duet-panel .duet-save-hint{margin:5px 0;font-size:11px}

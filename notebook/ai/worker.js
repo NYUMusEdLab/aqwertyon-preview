@@ -5,7 +5,10 @@ self.onmessage=({data})=>{queue=queue.then(async()=>{
  try{
   if(!model){await tf.setBackend('cpu');await tf.ready();model=new music_rnn.MusicRNN(new URL('model/',self.location).href);await model.initialize();}
   if(data.type==='init'){postMessage({id:data.id,ready:true});return;}
-  const sequence=await model.continueSequence(data.sequence,data.steps,data.temperature);
-  postMessage({id:data.id,sequence});
+  // A stochastic sample may contain only rest tokens; retry before returning it.
+  let sequence,attempts=0;
+  do{attempts++;sequence=await model.continueSequence(data.sequence,attempts===1?data.steps:Math.max(48,data.steps),attempts===1?data.temperature:1.0);}
+  while(attempts<3&&!(sequence.notes||[]).some(n=>Number.isFinite(n.pitch)));
+  postMessage({id:data.id,sequence,attempts});
  }catch(e){postMessage({id:data.id,error:e.message||'The melody model could not run.'});}
 });};

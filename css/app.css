@@ -1,0 +1,618 @@
+/*********
+General CSS
+*********/
+
+html {
+    height: 100%;
+}
+
+body {
+    font-family: 'Lato', sans-serif;
+    /*padding: 2em;*/
+    margin: 0;
+}
+
+img {
+    vertical-align: middle;
+}
+
+a {
+    text-decoration: none;
+    color: inherit;
+}
+
+.hidden {
+    display: none !important;
+}
+
+header {
+    height: 32px;
+    padding: 18px;
+    background: #ffffff;
+    border-bottom: 1px solid #cccccc;
+    margin-bottom: 20px;
+}
+
+header #logo1 {
+    width: 143px;
+    height: 69px;
+    background-image: url(../img/aqw-logo-132x69.png);
+    margin: 0;
+    position: absolute;
+    left: 17px;
+    top: 0;
+    border-right: 1px solid #cccccc;
+    background-repeat: no-repeat;
+}
+
+header #logo2 {
+    width: 170px;
+    height: 39px;
+    background-image: url(../img/aqw-arrows-open.png);
+    background-repeat: no-repeat;
+    margin: 0;
+    position: absolute;
+    left: 182px;
+    top: 15px;
+    cursor: pointer;
+    border: 1px solid darkgray;
+    padding-left: 14px;
+    font-size: 13px;
+    border-radius: 20px;
+    background-position-x: 150px;
+    background-position-y: center;
+    line-height: 2.9;
+}
+
+header #logo2.close {
+    background-image: url(../img/aqw-arrows-close.png);
+    background-color: #11d1d5;
+}
+
+header #videoToggle {
+    margin-left: -5px;
+    margin-right: 4px;
+}
+
+header #session {
+    border-left: solid 1px #cccccc;
+    position: absolute;
+    padding: 20px;
+    top: 0;
+    right: 0;
+    width: 280px;
+    height: 28px;
+}
+
+#shareURL {
+    width: 150px;
+    display: inline-block;
+    background-color: white;
+    margin-left: 5px;
+}
+
+.mainContent {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: #f6f6f6;
+}
+
+/*********
+Mobile Layout
+*********/
+
+body.mobile {
+    height: 100%;
+}
+
+.mobile header {
+    margin-bottom: 0;
+    padding: 0;
+    height: 49px;
+}
+
+.mobile header #logo1 {
+    width: 96px;
+    height: 50px;
+    left: 0;
+    background-size: 100% 100%;
+}
+
+.mobile header #logo2 {
+    width: 183px;
+    right: 5px;
+    top: 15px;
+}
+
+/* Hide share menu for now */
+.mobile #session {
+    display: none;
+}
+
+.mobile .mainContent {
+    height: calc(100% - 75px);
+    overflow: hidden;
+    box-sizing: border-box;
+    padding: 10px;
+}
+
+.mobile .footer {
+    height: 15px;
+    padding: 5px 0;
+    margin: 0;
+    line-height: normal;
+}
+
+.mobile .row {
+    margin-right: -10px;
+}
+
+.mobile .row:not(:first-child) {
+    margin-top: 10px;
+}
+
+.mobile .row > * {
+    margin-right: 10px;
+}
+
+@media (orientation: portrait) {
+    .mobile .row {
+        flex-wrap: wrap;
+    }
+}
+
+/*********
+Form Elements
+*********/
+
+/* Form element reset from Foundation */
+input[type="text"], input[type="password"], input[type="date"], input[type="datetime"], input[type="datetime-local"], input[type="month"], input[type="week"], input[type="email"], input[type="number"], input[type="search"], input[type="tel"], input[type="time"], input[type="url"], input[type="color"], textarea {
+    -webkit-appearance: none;
+    border-radius: 0;
+    background-color: #FFFFFF;
+    font-family: inherit;
+    border-style: solid;
+    border-width: 1px;
+    border-color: #cccccc;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+    color: rgba(0, 0, 0, 0.75);
+    display: block;
+    font-size: 0.875rem;
+    margin: 0 0 1rem 0;
+    padding: 0.5rem;
+    height: 2.3125rem;
+    width: 100%;
+    -webkit-box-sizing: border-box;
+    -moz-box-sizing: border-box;
+    box-sizing: border-box;
+    transition: all 0.15s linear;
+}
+
+/*********
+Blocks
+*********/
+
+.row {
+    display: flex;
+    margin-right: -20px;
+}
+
+.row:not(:first-child) {
+    margin-top: 20px;
+}
+
+.row > * {
+    margin-right: 20px;
+}
+
+.videoBlk {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.videoBlk iframe {
+    width: 100%;
+    height: 100%;
+    flex: 1;
+    border: none;
+}
+
+/*
+	.videoBlk .videoWrapper {
+		position: relative;
+		padding-bottom: 56.25%;
+		padding-top: 75px;
+		height: 0;
+	 	z-index: 0;
+		background-color: #F2F2F2;
+	}
+
+	.videoBlk .videoWrapper iframe {
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 100%;
+		z-index: 0;
+	}*/
+
+/*.ctrlBlk {
+	text-align: center;
+}
+
+.ctrlBlk .circle {
+	position: absolute;
+	top:  25%;
+	left: 14%;
+	z-index: 2;
+}
+
+.ctrlBlk .playX {
+	top:  51%;
+	left: 34%;
+	position: absolute;
+	z-index: 10;
+}
+
+.ctrlBlk .recX {
+	top:  51%;
+	left: 50%;
+	position: absolute;
+	z-index: 10;
+}*/
+
+#keyboardContainer:focus {
+    outline: 0;
+}
+
+/* AFAICT can't set style from here and have NexusUI canvas honor size here :( */
+/*#aqKeyboard {*/
+/*padding-left: 0;*/
+/*padding-right: 0;*/
+/*margin-left: auto;*/
+/*margin-right: auto;*/
+/*display: block;*/
+/*width:960px;*/
+/*height:268px*/
+/*}*/
+
+#scoreImageContainer {
+    flex: 1;
+}
+
+#scoreImageContainer img {
+    width: 100%;
+}
+
+/*********
+Keyboard
+*********/
+#keyboardContainer {
+    flex: 1;
+}
+
+#keyboardContainer .mused-button-grid {
+    height: 200px;
+    outline: 0;
+}
+
+#keyboardContainer .mused-button-grid .mused-button-overlay {
+    background-color: rgba(0, 0, 0, 0.4);
+    font-size: 40px;
+}
+
+.mused-button-grid .mused-button-row {
+    display: flex;
+    flex: 1;
+    margin: 0 -1px;
+}
+
+.mused-button-grid .mused-button-row:first-child {
+    margin-top: -1px;
+}
+
+.mused-button-grid .mused-button-row:last-child {
+    margin-bottom: -1px;
+}
+
+.mused-button-grid .mused-button {
+    background-color: #f0f0f0;
+    color: #8f8f8f;
+    border: solid 1px #8f8f8f;
+    margin: 1px;
+    border-radius: 3px;
+    transition: background-color 0.08s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: default;
+}
+
+.mused-button-grid .mused-button.disabled {
+    background-color: #fff;
+}
+
+.mused-button-grid .mused-button.triggered {
+    background-color: #00d1d4;
+    color: #fff;
+}
+
+.accidental {
+    pointer-events: none;
+}
+
+.accidental.sharp {
+    margin-left: -1px;
+    letter-spacing: -3px;
+    font-size: 77%;
+    padding-top: 0px;
+}
+
+.accidental.flat {
+    margin-left: -3px;
+    letter-spacing: -6px;
+    font-size: 80%;
+    padding-top: 2px;
+}
+
+.accidental.doublesharp {
+    letter-spacing: -3px;
+    font-size: 170%;
+    padding-left: 2px;
+    padding-top: 3px;
+    font-weight: lighter;
+}
+
+.accidental.doubleflat {
+    letter-spacing: -6px;
+    font-size: 110%;
+    padding-left: 2px;
+    padding-top: 8px;
+    font-weight: lighter;
+}
+
+/*********
+YouTube Stuff
+*********/
+
+.youTubeInput input {
+    margin-bottom: 10px;
+}
+
+/*********
+Take/Instrument Numbers
+*********/
+
+.takeNum {
+    /*border: 2px solid #888;*/
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    text-align: center;
+}
+
+/*.takeNum .activeNum {
+
+}
+
+.takeNum .inactiveNum {
+
+}*/
+
+.takeNum .button {
+    width: 100%;
+    margin-bottom: 0;
+    border-bottom: 2px solid #FFF;
+}
+
+/*********
+Volume Design
+*********/
+
+.volCtrl {
+    text-align: center;
+}
+
+/*********
+Drop Down Menu
+*********/
+.optionMenu {
+    flex-shrink: 1;
+}
+
+.optionMenu label {
+    text-transform: uppercase;
+    font-size: 12px;
+    font-weight: bold;
+    display: block;
+    margin-bottom: 2px;
+}
+
+.optionMenu select, #rootMenu {
+    text-transform: capitalize;
+    -webkit-appearance: none;
+    border-radius: 0;
+    padding: 8px 28px 8px 8px;
+    font-size: 16px;
+    outline: none;
+    border: none;
+    color: #fff;
+    background-image: url(../img/buttons/aqwertyon_ux_arrow.png);
+    background-repeat: no-repeat;
+    background-position: calc(100% - 10px) center;
+    font-family: Lato, sans-serif; /** Nexus UI Reset **/
+    width: auto; /** Nexus UI Reset **/
+}
+
+.row.scaleContainer {
+    margin-right: 0;
+}
+
+#scaleTypeMenu {
+    background-color: #2dc1e7;
+}
+
+#scaleMenu {
+    background-color: #09c7a3;
+}
+
+#rootMenu {
+    background-color: #a907b5;
+}
+
+div#rootMenu {
+    width: 200px;
+    box-sizing: border-box;
+}
+
+#rootKeyboard {
+    margin-top: 5px;
+    border: solid 1px #ccc;
+    width: 200px !important;
+    height: 47px !important;
+}
+
+#synthMenu {
+    background-color: #3399ff;
+}
+
+#takesMenu {
+    background-color: #8b71ff;
+}
+
+/************
+video click stopper
+************/
+
+.videoClickStopper {
+    z-index: 999;
+    height: 97%;
+    width: 95%;
+    position: absolute;
+    top: 37px;
+    left: 0.99em;
+    /*background:red;*/
+}
+
+.videoClickStopper:hover {
+    cursor: pointer;
+}
+
+/*
+WIP UI
+*/
+
+.app-preset-link {
+    cursor: pointer;
+    display: flex;
+}
+
+.app-preset-text {
+    display: inline-block;
+    margin-top: auto;
+    margin-bottom: auto;
+}
+
+.app-preset-text p {
+    font-size: 12px;
+}
+
+.app-sequence-title {
+    font-size: 15px;
+    text-align: center;
+    font-weight: 900;
+    padding-top: 5px;
+    padding-bottom: 9px;
+    border-bottom: 1px solid #cccccc;
+}
+
+.aq-label {
+    color: black;
+}
+
+.aq-dropdown {
+    display: inline-block;
+}
+
+.aq-menu-block {
+    display: inline-block;
+}
+
+.footer {
+    width: 100%;
+    height: 150px;
+    margin-top: 100px;
+    background-color: #fafaf4;
+    font-size: 13px;
+    font-weight: lighter;
+    color: #a3a3a3;
+    text-align: center;
+    letter-spacing: 1px;
+    line-height: 135px;
+}
+
+.preset-panel {
+    position: absolute;
+    z-index: 50;
+    width: 600px;
+    top: 68px;
+    left: 128px;
+    border: 1px solid darkgray;
+    background-color: white;
+    padding: 5px 20px 20px;
+    border-radius: 18px;
+    transition: margin 0.5s;
+    max-height: 521px;
+    overflow-y: scroll;
+}
+
+.preset-panel.hidden {
+    margin-top: -100%;
+    z-index: -10;
+}
+
+.preset-panel li {
+    list-style: none;
+    margin-bottom: 10px;
+}
+
+.preset-panel img {
+    padding-right: 10px;
+}
+
+/*
+EMBED-SPECIFIC UI CHANGES
+ */
+body.embed header {
+    margin-bottom: 0;
+}
+
+body.embed .footer {
+    margin-top: 0;
+    height: 20px;
+    line-height: 20px;
+}
+
+/************************* Responsive Sizing **********************************/
+@media (max-width: 1000px) {
+    header #logo1 {
+        left: 0px;
+    }
+
+    header #logo2 {
+        right: 310px;
+    }
+
+    header #session {
+        width: 240px;
+    }
+}
+
+@media (max-width: 625px) {
+    header #logo2 {
+        background-position: right;
+        width: 90px;
+    }
+}

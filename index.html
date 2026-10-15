@@ -1,0 +1,45 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>aQWERTYon · Melody Notebook preview</title><meta name="referrer" content="strict-origin-when-cross-origin">
+
+    
+    <link href='//fonts.googleapis.com/css?family=Lato' rel='stylesheet' type='text/css'>
+    
+    
+
+    <link rel="stylesheet" href="css/app.css"/>
+    <link rel="stylesheet" href="css/root-widget.css"/><link rel="stylesheet" href="css/preview.css">
+
+    <script src="js/vendor/jquery.js"></script>
+    
+    <!-- <script src="js/vendor/sheetrock.min.js"></script> -->
+
+    <script language="javascript" type="text/javascript" src="js/vendor/nexusUI.js"></script>
+
+    
+</head>
+<body>
+<header>
+    <a href="https://musedlab.org" target="_blank"><h1 id="logo1" alt="mused lab — NYU music experience design"></h1></a>
+    <h2 id="logo2" class="hidden">Select a preset</h2>
+
+    <div id="session">
+        <img id="videoToggle" src="img/video_player.png" width="16px">
+        <span>Share: </span><span id='sessionText'><img id="copy-shareURL" title="Copy to clipboard" src="img/aq-copy.png"></span>
+        <input id="shareURL" type="text" aria-label="Share instrument settings" value="loading..." onclick="this.select()" readonly />
+    </div>
+
+</header>
+
+<p class="preview-label">aQWERTYon · Preview with Melody Notebook</p><section id="main" class="mainContent"></section>
+
+<div class="footer">
+    <a href="https://musedlab.org" target="_blank">NYU Music Experience Design Lab © 2015</a>
+</div>
+
+<script language="javascript" type="text/javascript" src="js/aq.js"></script>
+<script type="module" src="notebook/notebook.mjs"></script></body>
+</html>

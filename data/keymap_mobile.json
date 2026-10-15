@@ -1,0 +1,50 @@
+[
+  [
+    { "name": "0-3", "eventType": "midi", "label": "1", "code": "Digit1" },
+    { "name": "1-3", "eventType": "midi", "label": "2", "code": "Digit2" },
+    { "name": "2-3", "eventType": "midi", "label": "3", "code": "Digit3" },
+    { "name": "3-3", "eventType": "midi", "label": "4", "code": "Digit4" },
+    { "name": "4-3", "eventType": "midi", "label": "5", "code": "Digit5" },
+    { "name": "5-3", "eventType": "midi", "label": "6", "code": "Digit6" },
+    { "name": "6-3", "eventType": "midi", "label": "7", "code": "Digit7" },
+    { "name": "7-3", "eventType": "midi", "label": "8", "code": "Digit8" },
+    { "name": "8-3", "eventType": "midi", "label": "9", "code": "Digit9" },
+    { "name": "9-3", "eventType": "midi", "label": "0", "code": "Digit0" }
+  ],
+  [
+    { "name": "0-2", "eventType": "midi", "label": "q",   "code": "KeyQ" },
+    { "name": "1-2", "eventType": "midi", "label": "w",   "code": "KeyW" },
+    { "name": "2-2", "eventType": "midi", "label": "e",   "code": "KeyE" },
+    { "name": "3-2", "eventType": "midi", "label": "r",   "code": "KeyR" },
+    { "name": "4-2", "eventType": "midi", "label": "t",   "code": "KeyT" },
+    { "name": "5-2", "eventType": "midi", "label": "y",   "code": "KeyY" },
+    { "name": "6-2", "eventType": "midi", "label": "u",   "code": "KeyU" },
+    { "name": "7-2", "eventType": "midi", "label": "i",   "code": "KeyI" },
+    { "name": "8-2", "eventType": "midi", "label": "o",   "code": "KeyO" },
+    { "name": "9-2", "eventType": "midi", "label": "p",   "code": "KeyP" }
+  ],
+  [
+    { "name": "0-1", "eventType": "midi", "label": "a",     "code": "KeyA" },
+    { "name": "1-1", "eventType": "midi", "label": "s",     "code": "KeyS" },
+    { "name": "2-1", "eventType": "midi", "label": "d",     "code": "KeyD" },
+    { "name": "3-1", "eventType": "midi", "label": "f",     "code": "KeyF" },
+    { "name": "4-1", "eventType": "midi", "label": "g",     "code": "KeyG" },
+    { "name": "5-1", "eventType": "midi", "label": "h",     "code": "KeyH" },
+    { "name": "6-1", "eventType": "midi", "label": "j",     "code": "KeyJ" },
+    { "name": "7-1", "eventType": "midi", "label": "k",     "code": "KeyK" },
+    { "name": "8-1", "eventType": "midi", "label": "l",     "code": "KeyL" },
+    { "name": "9-1", "eventType": "midi", "label": ";",     "code": "Semicolon" }
+  ],
+  [
+    { "name": "0-0", "eventType": "midi", "label": "z",     "code": "KeyZ" },
+    { "name": "1-0", "eventType": "midi", "label": "x",     "code": "KeyX" },
+    { "name": "2-0", "eventType": "midi", "label": "c",     "code": "KeyC" },
+    { "name": "3-0", "eventType": "midi", "label": "v",     "code": "KeyV" },
+    { "name": "4-0", "eventType": "midi", "label": "b",     "code": "KeyB" },
+    { "name": "5-0", "eventType": "midi", "label": "n",     "code": "KeyN" },
+    { "name": "6-0", "eventType": "midi", "label": "m",     "code": "KeyM" },
+    { "name": "7-0", "eventType": "midi", "label": ",",     "code": "Comma" },
+    { "name": "8-0", "eventType": "midi", "label": ".",     "code": "Period" },
+    { "name": "9-0", "eventType": "midi", "label": "/",     "code": "Slash" }
+  ]
+]

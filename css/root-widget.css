@@ -1,0 +1,111 @@
+.note-picker .mused-button-grid {
+    outline: none;
+}
+
+.note-picker .mused-button-row {
+    margin: 0;
+    border-top: 1px solid #918483;
+    pointer-events: none;
+}
+
+.note-picker .mused-button {
+    pointer-events: all;
+}
+
+.note-picker .mused-button-row:nth-child(4) {
+    border-bottom: 1px solid #918483;
+}
+
+.note-picker .mused-button-grid .mused-button {
+    margin: 0;
+    border-radius: 0;
+}
+
+.note-picker .mused-button.empty {
+    border: none;
+    background: none;
+}
+
+.note-picker .mused-button.half-tone {
+    background-color: #3d3c3c;
+    color: #918483;
+    border: none;
+    margin-top: 1px;
+}
+
+.note-picker .mused-button.half-tone.triggered {
+    background-color: #f8ecec;
+}
+
+.note-picker .mused-button.half-tone.selected {
+    background-color: #a907b5;
+}
+
+.note-picker .mused-button.half-tone.disabled {
+    background-color: #989898;
+}
+
+.note-picker .mused-button.full-tone {
+    background-color: #eeebeb;
+    outline-color: #918483;
+    outline-width: 1px;
+    outline-style: solid;
+    color: #918483;
+    align-items: flex-end;
+}
+
+.note-picker .mused-button.full-tone.triggered {
+    background-color: #fcf9f9;
+}
+
+.note-picker .mused-button.full-tone.selected {
+    background-color: #a907b5;
+}
+
+.note-picker .mused-button.full-tone.disabled {
+    background-color: #d0d0d0;
+}
+
+.note-picker .mused-button.control {
+    background-color: #918483;
+    color: #cfc5c5;
+    border-top: 1px solid #918483;
+}
+
+.note-picker .mused-button.control.disabled {
+    background-color: #676767;
+}
+
+.note-picker .mused-button.empty {
+}
+
+.note-picker .control.icon {
+    width: 20px;
+    height: 20px;
+    pointer-events: none;
+}
+
+#octave-down-button {
+    background-image: url("../img/buttons/left-arrow-icon.svg");
+}
+
+#octave-up-button {
+    background-image: url("../img/buttons/right-arrow-icon.svg");
+}
+
+.disabled #octave-down-button {
+    background-image: url("../img/buttons/left-arrow-disabled.svg");
+}
+
+.disabled #octave-up-button {
+    background-image: url("../img/buttons/right-arrow-disabled.svg");
+}
+
+
+.note-picker.container {
+    background-color: #918483;
+}
+
+#rootMenu {
+    background-color: #a907b5;
+}

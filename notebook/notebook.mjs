@@ -69,6 +69,7 @@ function stop(){
 async function play(take,withVideo,fromDuet=false){
  const focusOnReplay=$('keyboardContainer').contains(document.activeElement)||!!document.activeElement.closest('.melody-actions');
  app.audioControls.resume();
+ if(withVideo)document.dispatchEvent(new CustomEvent('aq:video-replay'));
  document.dispatchEvent(new CustomEvent('aq:replay-start',{detail:{id:take.id,kind:take.kind}}));
  app.releaseNotes();recorder.finish('replay');stop();const run=++generation;
  replayId=take.id;status('Loading melody sound…');render();

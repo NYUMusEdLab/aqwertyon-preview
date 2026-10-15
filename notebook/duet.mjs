@@ -81,7 +81,8 @@ export function initDuet(app){
   }
  };
  find('duet-stop').onclick=stop;
- function selectMode(value){const ai=value==='ai';box.dataset.playMode=value;box.classList.toggle('duet-active',ai);panel.hidden=!ai;roll.visible(ai);mode.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mode===value)));if(value!=='video'&&app.video.ready)app.video.player.pauseVideo();if(!ai&&enabled)stop();app.resize();if(ai&&!enabled)find('duet-start').click();if(value==='video'&&app.video.videoSlug==='cmsd')app.video.load();}
+ function selectMode(value,loadVideo=true){const ai=value==='ai';box.dataset.playMode=value;box.classList.toggle('duet-active',ai);panel.hidden=!ai;roll.visible(ai);mode.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mode===value)));if(value!=='video'&&app.video.ready)app.video.player.pauseVideo();if(!ai&&enabled)stop();app.resize();if(ai&&!enabled)find('duet-start').click();if(loadVideo&&value==='video'&&app.video.videoSlug==='cmsd')app.video.load();}
+ document.addEventListener('aq:video-replay',()=>selectMode('video',false));
  let pointerMode=false;
  mode.addEventListener('pointerdown',e=>{pointerMode=e.button===0;});
  mode.addEventListener('keydown',()=>{pointerMode=false;});

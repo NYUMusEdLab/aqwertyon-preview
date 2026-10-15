@@ -1,0 +1,24 @@
+Melody AI for aQWERTYon
+
+Inspired by A.I. Duet (2016), by Yotam Mann with Google Creative Lab and Magenta.
+https://yotammann.info/aiexperiments
+https://github.com/googlecreativelab/aiexperiments-ai-duet
+This is a new integration, not a restoration of that server or a Google product.
+
+Uses @magenta/music 1.23.1, copyright Google, Apache License 2.0.
+Uses TensorFlow.js 2.7.0, copyright Google, Apache License 2.0.
+Complete licenses accompany the runtime in vendor/.
+Magenta's hosted basic_rnn checkpoint is mirrored locally as permitted by its
+checkpoint documentation: https://github.com/magenta/magenta-js/blob/master/music/checkpoints/README.md
+Exact sources, sizes, SHA-256 values: provenance.json.
+
+Model inference runs in a Web Worker on this device. No notes are sent to a
+model server. Model/runtime downloads occur only on Start AI. Existing
+instrument soundfonts retain their original hosting.
+
+Musical adaptation: monophonic upper voice from chords; prompt octave
+normalization; phrase-derived tempo; moderate model temperature; reply
+register/scale projection and bounded leaps; the player's onset spacing and
+articulation; a related opening motif and optional tonic/fifth ending in
+Related mode. Explore uses higher sampling temperature and no forced ending.
+These are design choices, not a claim of objectively superior musicality.

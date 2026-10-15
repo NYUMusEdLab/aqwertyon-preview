@@ -28264,6 +28264,11 @@ ScalePicker.prototype = {
      * A MIDI note identifying the root for the current scale
      * @type {string}
      */
+    isValidScale: function isValidScale(value) {
+        return !!Theory.slugToPitchSet[value];
+    },
+
+
     get scale() {
         return this._scale;
     },

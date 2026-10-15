@@ -2,3 +2,20 @@
 header #logo1{position:static;flex-shrink:0;height:50px;background-size:110px auto;background-position:center;border:0;width:120px}header #logo2{position:static;width:auto;max-width:420px;padding:8px 28px 8px 14px;background-position:right 6px center;line-height:1.4;min-height:39px}header #session{position:static;height:auto;width:auto;max-width:100%;padding:0;border:0}.mobile header{height:auto;padding:10px}.mobile header #logo1{width:100px}.mobile header #logo2{width:auto}.mobile .mainContent{height:auto;overflow:visible}.mobile #session{display:flex}.row>*{min-width:0}.row{margin-right:0}.row>#keyboardContainer{flex:1}#keyboardContainer .mused-button{min-width:0}.mobile .row{margin-right:0}.mobile .row>*{margin-right:0}.mobile #main>.row:first-child{display:block}.mobile .videoBlk{display:flex}.preset-panel{box-sizing:border-box;padding:12px!important}.preset-panel .app-preset-link{height:auto!important;min-height:85px;padding:10px!important}.preset-panel ul{margin:0!important}.preset-panel li{margin:0!important;min-width:0}#melody-notebook{scroll-margin-top:20px}@media(max-width:800px){header #logo2{max-width:calc(100% - 145px)}#keyboardContainer .mused-button{font-size:12px;padding:4px 1px}.row.scaleContainer{gap:8px}.scaleContainer .optionMenu{margin:0}.video-form{flex-wrap:wrap}}@media(max-width:520px){header #session{width:100%}.row>#keyboardContainer{flex-basis:calc(100% - 40px)}#keyboardContainer .mused-button{font-size:10px;padding:4px 0}.row.scaleContainer{width:100%;flex-wrap:wrap}.scaleContainer select{max-width:100%}header #logo2{font-size:12px}.video-form input{flex-basis:100%}}
 
 .sound-status{display:block;font-size:12px;color:#526561;max-width:220px;margin-top:5px}
+
+/* Notebook replay uses the same illuminated key treatment as live playing. */
+#keyboardContainer .mused-button.notebook-playing { background-color: #00d1d4; color: #fff; }
+
+.duet-mode {display:flex;align-items:center;gap:.6rem;padding:.6rem 0;font-size:15px;}
+.duet-mode select,.duet-controls select {font:inherit;padding:.35rem;max-width:100%;}
+.videoBlk.duet-active > :not(.duet-mode):not(.duet-panel) {display:none!important;}
+.duet-panel {box-sizing:border-box;width:100%;padding:14px;background:#f7f7ef;color:#24363c;border-radius:8px;}
+.duet-panel[hidden] {display:none;}
+.duet-panel h3 {margin:0 0 8px;font-size:22px;}
+.duet-panel p {font-size:14px;line-height:1.4;margin:8px 0;}
+.duet-controls {display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+.duet-panel button {padding:9px 12px;background:#234b55;color:#fff;border:0;border-radius:4px;cursor:pointer;}
+.duet-panel button:disabled {opacity:.5;cursor:default;}
+.duet-panel canvas {display:block;width:100%;height:110px;background:#fff;border-radius:4px;}
+.duet-panel .duet-credit {font-size:11px;}
+.duet-panel .duet-credit a {color:#245b6b;}

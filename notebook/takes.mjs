@@ -141,7 +141,7 @@ export function createRecorder(opts) {
     },
     /* the live, unfinished take (for drawing while playing) */
     current() { return cur ? { events: cur.events, t0: cur.t0, held: cur.held } : null; },
-    finish: () => finish('manual'),
+    finish: (reason='manual') => finish(reason),
     active: () => !!cur
   };
 }

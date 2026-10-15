@@ -1,4 +1,5 @@
 import * as TK from './takes.mjs';
+import {initDuet} from './duet.mjs';
 let app,recorder,replay,removed=null,replayId=null,previous=null,liveFrame=0,replayCounts=new Map(),generation=0;
 const $=id=>document.getElementById(id);
 const tool='aqwertyon-preview';
@@ -16,7 +17,7 @@ function render(){
  for(const take of list){
   const card=document.createElement('article');card.className='melody-card';card.dataset.id=take.id;
   const title=document.createElement('input');title.type='text';title.maxLength=200;title.value=take.title||'Untitled melody';title.setAttribute('aria-label','Melody name');title.addEventListener('change',()=>TK.rename(take.id,title.value.trim()));
-  const info=document.createElement('p');info.textContent=`${(take.duration/1000).toFixed(1)} s · ${take.cfg?.scaleSlug||'scale'} · ${take.cfg?.soundSlug?.replaceAll('_',' ')||'sound'}`;
+  const info=document.createElement('p');info.textContent=(take.origin==='ai'?'AI reply · ':'')+`${(take.duration/1000).toFixed(1)} s · ${take.cfg?.scaleSlug||'scale'} · ${take.cfg?.soundSlug?.replaceAll('_',' ')||'sound'}`;
   const canvas=document.createElement('canvas');canvas.height=100;canvas.setAttribute('role','img');canvas.setAttribute('aria-label','Piano roll of '+(take.title||'untitled melody'));
   const controls=document.createElement('div');controls.className='melody-actions';
   const button=(text,fn)=>{const b=document.createElement('button');b.type='button';b.textContent=text;b.onclick=fn;controls.append(b);return b;};
@@ -27,16 +28,34 @@ function render(){
  }
  storage();
 }
+function replayLights(){
+ for(const b of Object.values(app.keyboard.buttons._buttonsByName)){
+  const lit=b.eventType==='midi'&&!b.disabled&&(replayCounts.get(b.eventData)||0)>0;
+  b.classList.toggle('notebook-playing',lit);
+ }
+}
 function stop(){
- generation++;replay.stop(true);replayCounts.clear();replayId=null;
- if(previous){app.audioControls.switchSound(previous.sound,'soundfont');if(app.video.ready){if(!previous.withVideo)app.video.player.seekTo(previous.time||0,true);if(previous.playing)app.video.player.playVideo();else app.video.player.pauseVideo();}previous=null;}
- status('Ready for your next melody');render();
+ generation++;replay.stop(true);replayCounts.clear();replayLights();replayId=null;
+ if(previous){
+  app.audioControls.switchSound(previous.sound,'soundfont');
+  app.rootPicker.root=previous.root;app.scalePicker.scale=previous.scale;
+  app.keyboard.mapping.layout=previous.layout;app.keyboard.mapping.transposition=previous.transposition;
+  if(app.video.ready){app.video.player.pauseVideo();if(!previous.withVideo)app.video.player.seekTo(previous.time||0,true);}
+  previous=null;
+ }
+ status('Ready for your next melody');render();document.dispatchEvent(new CustomEvent('aq:replay-stop'));
  $('keyboardContainer').focus({preventScroll:true});
 }
 async function play(take,withVideo){
- app.releaseNotes();recorder.finish();stop();const run=++generation;
+ document.dispatchEvent(new CustomEvent('aq:replay-start',{detail:{id:take.id}}));
+ app.releaseNotes();recorder.finish('replay');stop();const run=++generation;
  replayId=take.id;status('Loading melody sound…');render();
- previous={sound:app.options.soundSlug,time:app.video.ready?app.video.player.getCurrentTime():0,playing:app.video.ready&&app.video.player.getPlayerState()===1,withVideo};
+ previous={root:app.keyboard.mapping.root,scale:app.scalePicker.scale,layout:app.options.features.layout,transposition:app.keyboard.mapping.transposition,sound:app.options.soundSlug,time:app.video.ready?app.video.player.getCurrentTime():0,playing:app.video.ready&&app.video.player.getPlayerState()===1,withVideo};
+ if(app.video.ready)app.video.player.pauseVideo();
+ app.rootPicker.root=Number.isInteger(take.cfg?.midiRoot)&&take.cfg.midiRoot>=0&&take.cfg.midiRoot<=127?take.cfg.midiRoot:previous.root;
+ app.scalePicker.scale=app.scalePicker.isValidScale(take.cfg?.scaleSlug)?take.cfg.scaleSlug:previous.scale;
+ app.keyboard.mapping.layout=/^(1|3|5|7|8|10|12|14|x)(-(1|3|5|7|8|10|12|14|x)){3}$/.test(take.cfg?.layout)?take.cfg.layout:previous.layout;
+ app.keyboard.mapping.transposition=0;
  const sound=take.cfg?.soundSlug||'rock_organ';app.audioControls.switchSound(sound,'soundfont');
  for(let i=0;i<100;i++){if(run!==generation)return;if(app.audioControls.sounds._currInstrument&&app.audioControls.sounds._requestedInstrument===sound&&app.audioControls.sounds._loadedInstruments[sound]===app.audioControls.sounds._currInstrument)break;await new Promise(r=>setTimeout(r,100));}
  if(run!==generation)return;
@@ -54,7 +73,7 @@ async function play(take,withVideo){
  }
  else if(app.video.ready)app.video.player.pauseVideo();
  status(withVideo?'Replaying with the video':'Replaying melody');
- replay.play(take,{onTick(ms){const c=[...$('melody-list').children].find(c=>c.dataset.id===take.id);if(c)TK.drawRoll(c.querySelector('canvas'),take.events,{pitches:pitches(take.events),labels:label,duration:take.duration,playhead:ms});},onEnd:()=>stop()});
+ replay.play(take,{onTick(ms){document.dispatchEvent(new CustomEvent('aq:replay-tick',{detail:{id:take.id,ms}}));const c=[...$('melody-list').children].find(c=>c.dataset.id===take.id);if(c)TK.drawRoll(c.querySelector('canvas'),take.events,{pitches:pitches(take.events),labels:label,duration:take.duration,playhead:ms});},onEnd:()=>stop()});
  $('keyboardContainer').focus({preventScroll:true});
 }
 function init(){
@@ -62,8 +81,8 @@ function init(){
  const section=document.createElement('details');section.id='melody-notebook';section.open=true;
  section.innerHTML='<summary>Melody Notebook <span id="melody-count">0</span></summary><div class="notebook-body"><p id="melody-status" role="status">Ready for your next melody</p><canvas id="melody-live" height="65" aria-label="Current melody piano roll" role="img"></canvas><p id="melody-storage"></p><p class="melody-note">Captures your played notes and timing, not microphone or video audio. Settings links do not include your melodies.</p><div class="melody-actions"><button id="melody-finish" type="button">Save phrase now</button><button id="melody-export" type="button">Export melodies</button><label class="import-label">Import melodies<input id="melody-import" type="file" accept=".json,application/json"></label><button id="melody-undo" type="button" hidden>Undo delete</button></div><div id="melody-list"></div></div>';
  document.getElementById('main').after(section);$('keyboardContainer').tabIndex=0;
- recorder=TK.createRecorder({tool,cfg,media:()=>app.video.ready&&app.video.player.getPlayerState()===1?{id:app.video.videoSlug,offset:app.video.player.getCurrentTime()}:null,onStart(){status('Capturing your melody…');cancelAnimationFrame(liveFrame);drawLive();},onEnd(t){cancelAnimationFrame(liveFrame);status(t?'Melody saved':'Play a little longer to keep a melody');render();}});
- replay=TK.createPlayer({noteOn(midi){const n=replayCounts.get(midi)||0;if(!n)app.audioControls.noteOn(midi);replayCounts.set(midi,n+1);},noteOff(midi){const n=Math.max(0,(replayCounts.get(midi)||0)-1);replayCounts.set(midi,n);if(!n)app.audioControls.noteOff(midi);}});
+ recorder=TK.createRecorder({tool,cfg,media:()=>app.video.ready&&app.video.player.getPlayerState()===1?{id:app.video.videoSlug,offset:app.video.player.getCurrentTime()}:null,onStart(){status('Capturing your melody…');cancelAnimationFrame(liveFrame);drawLive();},onEnd(t,reason){cancelAnimationFrame(liveFrame);status(t?'Melody saved':'Play a little longer to keep a melody');render();if(t&&(reason==='gap'||reason==='manual'))document.dispatchEvent(new CustomEvent('aq:phrase',{detail:t}));}});
+ replay=TK.createPlayer({noteOn(midi){const n=replayCounts.get(midi)||0;if(!n)app.audioControls.noteOn(midi);replayCounts.set(midi,n+1);replayLights();},noteOff(midi){const n=Math.max(0,(replayCounts.get(midi)||0)-1);replayCounts.set(midi,n);if(!n)app.audioControls.noteOff(midi);replayLights();}});
  document.addEventListener('aq:note',e=>{if(replayId){if(e.detail.type==='on')stop();return;}const d=e.detail;d.type==='on'?recorder.noteOn(d.midi,d.code):recorder.noteOff(d.midi,d.code);});
  document.addEventListener('aq:configuration',()=>{app.releaseNotes();recorder.finish();if(replayId)stop();});
  document.addEventListener('aq:takes',render);
@@ -78,6 +97,6 @@ function init(){
  $('melody-undo').onclick=()=>{if(removed){TK.save(removed);removed=null;}$('melody-undo').hidden=true;};
  section.addEventListener('toggle',()=>{if(section.open)render();else if(replayId)stop();});
  window.addEventListener('resize',render);render();
- window.aqNotebook={recorder,replay,play,stop,TK};
+ window.aqNotebook={recorder,replay,play,stop,TK};initDuet(app);
 }
 document.addEventListener('aq:ready',()=>setTimeout(init,0));if(window.appInfo?.app)setTimeout(init,0);

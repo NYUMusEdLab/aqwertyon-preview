@@ -60354,14 +60354,15 @@ KeyMapper.prototype = {
                 var delta = b.eventData - _this._root,
                     pc = (delta % 12 + 12) % 12,
                     octave = Math.floor(delta / 12);
-                b.label = ['1', '♭2', '2', '♭3', '3', '4', '♯4', '5', '♭6', '6', '♭7', '7'][pc] + (octave > 0 ? '\u0307'.repeat(octave) : '\u0323'.repeat(-octave));
+                b.label = '<span class="jianpu-upper">' + (octave > 0 ? '•'.repeat(octave) : '') + '</span><span class="jianpu-number">' + ['1', '♭2', '2', '♭3', '3', '4', '♯4', '5', '♭6', '6', '♭7', '7'][pc] + '</span><span class="jianpu-lower">' + (octave < 0 ? '•'.repeat(-octave) : '') + '</span>';
+                b._domNode.setAttribute('aria-label', spelling + ' · ' + key);
             } else b.label = mode === 'keys' ? key : note;
             var plain = document.createElement('span');plain.innerHTML = note;
             b._domNode.dataset.secondary = mode === 'keys' ? plain.textContent : key;
             var primary = document.createElement('span');primary.className = 'key-main';while (b._domNode.firstChild) {
                 primary.appendChild(b._domNode.firstChild);
             }b._domNode.appendChild(primary);
-            b._domNode.classList.add('theory-key');
+            b._domNode.classList.add('theory-key');b._domNode.classList.toggle('jianpu-key', mode === 'jianpu');
         });
     }
 };
@@ -61404,7 +61405,59 @@ function renderStaff(host, notes) {
   }
   var svg = host.querySelector('svg');svg.setAttribute('viewBox', '0 0 360 260');svg.setAttribute('role', 'img');svg.setAttribute('aria-label', 'Live staff notation');
 }
-module.exports = { roots: roots, rootName: rootName, pretty: pretty, spell: spell, scaleNotes: scaleNotes, renderStaff: renderStaff };
+function renderPreview(host, midis, held, root, slug) {
+  host.innerHTML = '';var clefs = ['treble', 'bass'].filter(function (c) {
+    return midis.some(function (m) {
+      return m >= 60 === (c === 'treble');
+    });
+  }),
+      height = Math.max(110, clefs.length * 100 + 10);var renderer = new Vex.Flow.Renderer(host, Vex.Flow.Renderer.Backends.SVG);renderer.resize(440, height);var ctx = renderer.getContext();
+  var _iteratorNormalCompletion = true;
+  var _didIteratorError = false;
+  var _iteratorError = undefined;
+
+  try {
+    var _loop2 = function _loop2() {
+      var _step$value = _slicedToArray(_step.value, 2),
+          i = _step$value[0],
+          clef = _step$value[1];
+
+      var y = i * 100;
+      var stave = new Vex.Flow.Stave(8, y, 424).addClef(clef);stave.setContext(ctx).draw();
+      var group = midis.filter(function (m) {
+        return m >= 60 === (clef === 'treble');
+      });
+      if (!group.length) return 'continue';
+      var notes = group.map(function (m) {
+        var n = tonal.note(spell(m, root, slug)),
+            note = new Vex.Flow.StaveNote({ clef: clef, keys: [n.pc + '/' + n.oct], duration: 'q' });note.setStyle({ fillStyle: held.includes(m) ? '#167a70' : '#9eaa98', strokeStyle: held.includes(m) ? '#167a70' : '#9eaa98' });return note;
+      });
+      var voice = new Vex.Flow.Voice({ num_beats: group.length, beat_value: 4 }).addTickables(notes);voice.setStave(stave);Vex.Flow.Accidental.applyAccidentals([voice], 'C');new Vex.Flow.Formatter().joinVoices([voice]).format([voice], 350);voice.setContext(ctx).draw();
+    };
+
+    for (var _iterator = clefs.entries()[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+      var _ret2 = _loop2();
+
+      if (_ret2 === 'continue') continue;
+    }
+  } catch (err) {
+    _didIteratorError = true;
+    _iteratorError = err;
+  } finally {
+    try {
+      if (!_iteratorNormalCompletion && _iterator.return) {
+        _iterator.return();
+      }
+    } finally {
+      if (_didIteratorError) {
+        throw _iteratorError;
+      }
+    }
+  }
+
+  var svg = host.querySelector('svg');svg.setAttribute('viewBox', '0 0 440 ' + height);svg.setAttribute('role', 'img');svg.setAttribute('aria-label', 'Mapped keyboard octave; played notes highlighted');
+}
+module.exports = { roots: roots, rootName: rootName, pretty: pretty, spell: spell, scaleNotes: scaleNotes, renderStaff: renderStaff, renderPreview: renderPreview };
 
 },{"./scales.json":72,"@tonaljs/tonal":21,"vexflow/releases/vexflow-debug":42}],72:[function(require,module,exports){
 module.exports={

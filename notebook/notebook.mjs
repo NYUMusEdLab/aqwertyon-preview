@@ -5,7 +5,7 @@ import * as TK from './takes.mjs';
 import {initNoteViews} from './note-views.mjs';
 import {initDuet} from './duet.mjs';
 let app,recorder,replay,removed=null,replayId=null,previous=null,liveFrame=0,replayCounts=new Map(),generation=0;
-let renderedFirst=null,undoSession=null;
+let renderedFirst=null,undoSession=null,pageStart=0,pageSize=1;
 let conversation,conversationSaveTimer=null,liveDuet=false,playingTake=null,conversationVoices=new Map();
 let replayKeys=new Map(),pitchKeys=new Map(),lastKey=null;
 const $=id=>document.getElementById(id);
@@ -20,10 +20,13 @@ function storage(){ $('melody-storage').textContent=TK.storageAvailable()?'Saved
 function render(){
  const host=$('melody-list'),active=document.activeElement;
  const editing=host.contains(active)&&active.matches('input')?{id:active.closest('article').dataset.id,value:active.value,start:active.selectionStart,end:active.selectionEnd}:null;
- host.replaceChildren();const list=TK.list(tool).flatMap(t=>conversationChunks(t));if(list[0]?.id!==renderedFirst)host.scrollLeft=0;renderedFirst=list[0]?.id;$('melody-count').textContent=list.length;
+ host.replaceChildren();const list=TK.list(tool).flatMap(t=>conversationChunks(t));if(list[0]?.id!==renderedFirst)pageStart=0;renderedFirst=list[0]?.id;$('melody-count').textContent=list.length;
  $('melody-export').disabled=!list.length;$('melody-clear').disabled=!list.length;
  if(!list.length){const p=document.createElement('p');p.textContent='Play two or more notes over at least 0.8 seconds. After you release the keys and pause for 2.5 seconds, your melody appears here.';host.append(p);}
- for(const take of list){
+ pageSize=Math.max(1,Math.floor((host.clientWidth||innerWidth)/290));pageStart=Math.min(pageStart,Math.max(0,Math.floor((list.length-1)/pageSize)*pageSize));
+ $('melody-newer').disabled=pageStart===0;$('melody-older').disabled=pageStart+pageSize>=list.length;
+ host.style.setProperty('--take-columns',pageSize);
+ for(const take of list.slice(pageStart,pageStart+pageSize)){
   const card=document.createElement('article');card.className='melody-card';card.dataset.id=take.id;
   const mode=take.kind==='conversation'||take.origin==='ai'||take.cfg?.captureMode==='ai'?'ai':take.media?.id?'video':'play';
   card.classList.add(mode+'-take');card.dataset.mode=mode;
@@ -161,8 +164,8 @@ function init(){
  $('melody-undo').onclick=()=>{if(undoSession){TK.save(undoSession);undoSession=null;removed=null;status('Saved session restored');}else if(removed){TK.restoreCleared(removed);removed=null;status('Saved melodies restored');}$('melody-undo').hidden=true;};
  section.addEventListener('toggle',()=>{if(section.open)render();else if(replayId)stop();});
  window.addEventListener('resize',render);render();
- $('melody-newer').onclick=()=>$('melody-list').scrollBy({left:-300,behavior:'smooth'});
- $('melody-older').onclick=()=>$('melody-list').scrollBy({left:300,behavior:'smooth'});
+ $('melody-newer').onclick=()=>{pageStart=Math.max(0,pageStart-pageSize);render();};
+ $('melody-older').onclick=()=>{pageStart+=pageSize;render();};
  $('melody-history').onclick=()=>{const on=section.classList.toggle('show-history');$('melody-history').setAttribute('aria-expanded',String(on));};
  window.aqNotebook={recorder,replay,play,stop,TK,conversation};initDuet(app);initNoteViews(app);
 }

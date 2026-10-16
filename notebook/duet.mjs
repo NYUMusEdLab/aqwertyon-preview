@@ -16,10 +16,6 @@ export function initDuet(app){
  const summary=document.createElement('summary');summary.textContent='Options';options.append(summary);
  options.append(find('duet-first').parentElement,find('duet-style-help'),find('backing-controls'),find('duet-new-conversation'),find('duet-keep'));
  panel.append(options);
- const moreStyles=document.createElement('details');moreStyles.className='duet-more-styles';
- moreStyles.innerHTML='<summary>More styles</summary><div class="duet-extra-styles"></div>';
- ['complement','harmonize','accompaniment'].forEach(value=>moreStyles.lastElementChild.append(find('duet-style').querySelector('[data-value="'+value+'"]')));
- find('duet-style').append(moreStyles);
  options.append(find('duet-conversation'));find('duet-conversation').hidden=true;find('duet-keep').hidden=true;
  const savedHint=document.createElement('p');savedHint.className='duet-save-hint';savedHint.textContent='Replies and conversations save automatically.';find('duet-roll').after(savedHint);
 

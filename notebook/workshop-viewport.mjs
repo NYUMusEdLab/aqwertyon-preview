@@ -20,7 +20,9 @@ export function installWorkshopViewport(setLanguage){
   const side=document.createElement('section');side.className='aq-shell-side';side.setAttribute('aria-label','Instrument and accompaniment / 乐器与伴奏');
   const play=document.createElement('section');play.className='aq-shell-play';play.setAttribute('aria-label','Playable keyboard / 演奏键盘');
   rows[0].classList.add('aq-shell-presets');rows[1].classList.add('aq-shell-mode');rows[2].classList.add('aq-shell-scale');rows[3].classList.add('aq-shell-keys');rows[4].classList.add('aq-shell-options');
-  side.append(rows[1],rows[4]);play.append(rows[2],rows[3]);main.append(side,play);
+  side.append(rows[1],rows[4]);play.append(rows[2],rows[3]);
+  const soundStatus=side.querySelector('.sound-status');if(soundStatus)play.prepend(soundStatus);
+  main.append(side,play);
   document.documentElement.classList.add('aq-viewport-fit');
   arranged=true;
   const fit=()=>{const v=window.visualViewport;const height=v&&v.scale===1?Math.min(innerHeight,v.height):innerHeight;document.documentElement.style.setProperty('--aq-viewport-height',Math.floor(height)+'px');};

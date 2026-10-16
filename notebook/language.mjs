@@ -1,6 +1,8 @@
 import {installWorkshopViewport} from './workshop-viewport.mjs';
 // UI translation only. Never rewrites input values, saved titles, musical data or URLs.
 const pairs={
+'Loading sound':'正在加载音色','Retry sound':'重试音色','Sound ready — play a key.':'音色已就绪，请演奏琴键。','Sound could not load. Previous sound is still available.':'无法加载音色，仍可使用之前的音色。','Sound could not load. Retry or choose another sound.':'无法加载音色，请重试或选择其他音色。',
+'Video ready.':'视频已就绪。','Loading video':'正在加载视频','Retry video':'重试视频','Loading video metadata…':'正在加载视频信息……','Buffering video…':'正在缓冲视频……','Video ready — press Play.':'视频已就绪，请按播放。','Video paused — press Play to continue.':'视频已暂停，请按播放继续。',
 'Follow melody':'跟随旋律','AI supplies a motif. Chords are arranged locally; Follow melody fits recent notes at each bar.':'AI 提供动机；和弦由本地规则编配。“跟随旋律”在每小节根据最近演奏的音符选择和弦。','Done':'完成','Video':'视频','AI duet':'AI 合奏',
 'Mapped octave · play to highlight.':'键盘映射音阶 · 演奏时高亮',
 'Octave':'八度','Live staff notation':'实时五线谱',

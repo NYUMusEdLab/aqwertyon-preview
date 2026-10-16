@@ -1,4 +1,4761 @@
 (function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
+module.exports={
+  "title": "Starting demos",
+  "sequence": [
+    {
+      "name": "CMSD · Virtual Piano Duet",
+      "prompt": "Improvise on the black keys with Steve Wogaman. Video streams directly from MusEDLab.",
+      "version": 2,
+      "options": {
+        "volume": 0.5,
+        "midiRoot": 66,
+        "videoSlug": "cmsd",
+        "scaleSlug": "major-pentatonic",
+        "soundSlug": "flute",
+        "scoreSlug": null,
+        "features": {
+          "layout": "1-3-5-8",
+          "audioEngine": "soundfont",
+          "showVideo": true,
+          "showKeyboard": true,
+          "showSounds": true,
+          "allControls": true,
+          "scaleControls": true,
+          "useNoteCaps": true
+        }
+      }
+    },
+    {
+      "name": "James Brown - \"Think\" (loop)",
+      "prompt": "Get on the good foot!",
+      "options": {
+        "volume": 0.8,
+        "features": {
+          "layout": "1-3-5-8",
+          "scaleControls": true,
+          "showTakes": false,
+          "allControls": true,
+          "audioEngine": "soundfont",
+          "showVideo": true,
+          "showScore": false,
+          "showSounds": true,
+          "showKeyboard": true,
+          "useNoteCaps": true
+        },
+        "midiRoot": 62,
+        "videoSlug": "R7iNSUoQ4Lk",
+        "scaleSlug": "minor-pentatonic",
+        "scoreSlug": null,
+        "soundSlug": "flute"
+      },
+      "version": 1
+    }
+  ]
+}
+
+},{}],2:[function(require,module,exports){
+'use strict';
+
+// Import different audio engines we might want to support
+var ClassicSounds = require('./audio/classic/sounds.js');
+var SoundfontSounds = require('./audio/soundfont/sounds.js');
+var Util = require('./util.js');
+var Tone = require('tone');
+var MediaReadiness = require('./MediaReadiness');
+
+var NullEngine = function NullEngine() {
+    this.instruments = [{ slug: 'none', name: 'None' }];
+};
+
+NullEngine.prototype = {
+    setInstrument: function setInstrument() {},
+    setMasterVolume: function setMasterVolume() {},
+    noteOn: function noteOn() {},
+    noteOff: function noteOff() {}
+};
+
+/**
+ * This class provides a generic wrapper around an Audio Engine, setting up the
+ * appropriate engine, and handling all audio-related controls (for now, volume
+ * dial and instrument selection).
+ */
+
+var AudioControls = function AudioControls(parent) {
+    this.parent = parent;
+
+    this.sounds = new NullEngine();
+    this.config = {
+        engineSlug: 'none',
+        engineConfigs: {
+            'classic': { soundSlug: 'bessie', class: ClassicSounds },
+            'soundfont': { soundSlug: 'flute', class: SoundfontSounds },
+            'none': { soundSlug: 'none', class: NullEngine }
+        }
+    };
+
+    // Publicly-available DOM Nodes
+    this.soundPicker;
+    this.volumeControl;
+
+    // DOM Nodes
+    this._soundPickerMenu;
+    this._volumeControlSlider;
+
+    this.initUI();
+};
+
+AudioControls.prototype = {
+    initUI: function initUI() {
+        this.setupSynthMenu();
+        this.setupVolumeDial();
+    },
+
+    setupSynthMenu: function setupSynthMenu() {
+        var _this = this;
+
+        this.soundPicker = document.createElement('div');
+        this.soundPicker.classList.add('optionMenu');
+
+        var label = document.createElement('label');
+        label.textContent = 'Sound';
+        this.soundPicker.appendChild(label);
+
+        this._soundPickerMenu = document.createElement('select');
+        this._soundPickerMenu.id = 'synthMenu';
+        this.soundPicker.appendChild(this._soundPickerMenu);
+        this.readiness = new MediaReadiness('sound-status', 'Loading sound', 'Retry sound', function () {
+            // Retry only the failed current choice; never replay the attempted key.
+            if (_this.readiness.element.dataset.state === 'error' && _this.sounds._requestedInstrument) _this.sounds.setInstrument(_this.sounds._requestedInstrument);
+        });
+        this.soundPicker.appendChild(this.readiness.element);
+        document.addEventListener('aq:sound-state', function (e) {
+            var d = e.detail;if (!d || d.engine !== _this.sounds) return;
+            var name = d.instrument.replace(/_/g, ' ');
+            var text = d.state === 'loading' ? 'Loading ' + name + '…' : d.state === 'ready' ? 'Sound ready — play a key.' : d.previousAvailable ? 'Sound could not load. Previous sound is still available.' : 'Sound could not load. Retry or choose another sound.';
+            _this.readiness.set(d.state, text);
+        });
+
+        var pointerSelection = false;
+        this._soundPickerMenu.addEventListener('pointerdown', function () {
+            pointerSelection = true;
+        });
+        this._soundPickerMenu.addEventListener('keydown', function () {
+            pointerSelection = false;
+        });
+        this._soundPickerMenu.addEventListener('change', function (event) {
+            var selected = event.target.value;
+            // End replay and restore its temporary settings before applying the user's choice.
+            document.dispatchEvent(new CustomEvent('aq:sound-selection'));
+            event.target.value = selected;
+            this.sounds.setInstrument(selected);
+            this.config.engineConfigs[this.config.engineSlug].soundSlug = event.target.value;
+
+            this.parent.sessionManager.logEvent('sound', event.target.value);
+            this.parent.logUpdatedOption('soundSlug', selected);
+            if (pointerSelection) {
+                this.parent.keyboard.keyboardContainer.focus({ preventScroll: true });this.parent.keyboard.buttons.activate();
+            }
+            pointerSelection = false;
+        }.bind(this));
+    },
+
+    setupVolumeDial: function setupVolumeDial() {
+        this.volumeControl = document.createElement('div');
+        this.volumeControl.classList.add('optionMenu');
+
+        var label = document.createElement('label');
+        label.textContent = 'Vol';
+        this.volumeControl.appendChild(label);
+
+        this._volumeControlSlider = nx.add('slider', {
+            w: 28,
+            name: 'volumeDial',
+            parent: 'volumeContainer'
+        });
+        this.volumeControl.appendChild(this._volumeControlSlider.canvas);
+
+        var debouncedUpdate = Util.debounce(function (volume) {
+            this.parent.logUpdatedOption('volume', volume);
+
+            this.parent.sessionManager.logEvent('volume', volume);
+            ga('send', 'event', 'volume', 'set', volume);
+        }.bind(this), 1000);
+
+        this._volumeControlSlider.on("*", function (data) {
+            this.sounds.setMasterVolume(data.value);
+
+            debouncedUpdate(data.value);
+        }.bind(this));
+    },
+
+    resume: function resume() {
+        if (Tone.context.state === 'suspended') Tone.context.resume();
+    },
+
+    noteOn: function noteOn(midiNote) {
+        this.resume();
+        this.sounds.noteOn(midiNote);
+    },
+
+    noteOff: function noteOff(midiNote) {
+        this.sounds.noteOff(midiNote);
+    },
+
+    switchSound: function switchSound(soundSlug, engineSlug) {
+        engineSlug = engineSlug || this.config.engineSlug;
+
+        if (engineSlug != this.config.engineSlug && engineSlug in this.config.engineConfigs) {
+            this.sounds = new this.config.engineConfigs[engineSlug].class();
+            this.config.engineSlug = engineSlug;
+            this.readiness.set('idle', '');
+
+            // Clear out old instruments
+            this._soundPickerMenu.innerHTML = '';
+
+            for (var i = 0; i < this.sounds.instruments.length; i++) {
+                var instrument = this.sounds.instruments[i];
+                var option = document.createElement('option');
+                option.value = instrument.slug;
+                option.innerHTML = instrument.name;
+
+                this._soundPickerMenu.appendChild(option);
+            }
+        }
+
+        var foundSound = false;
+        for (var i = 0; i < this.sounds.instruments.length; i++) {
+            if (this.sounds.instruments[i].slug === soundSlug) {
+                this._soundPickerMenu.value = soundSlug;
+
+                // TODO: Evaluate whether we need to trigger all of these...
+                this.sounds.setInstrument(soundSlug);
+                this.config.engineConfigs[this.config.engineSlug].soundSlug = soundSlug;
+
+                this.parent.sessionManager.logEvent('sound', soundSlug);
+                this.parent.logUpdatedOption('soundSlug', soundSlug);
+
+                foundSound = true;
+                break;
+            }
+        }
+
+        if (foundSound) {
+            this.config.engineConfigs[this.config.engineSlug].soundSlug = soundSlug;
+        } else {
+            this.switchSound(this.config.engineConfigs[this.config.engineSlug].soundSlug);
+        }
+    },
+
+    toggleSoundPicker: function toggleSoundPicker(show) {
+        show = show && this.config.engineSlug != 'none';
+
+        this.soundPicker.classList.toggle('hidden', !show);
+    }
+};
+
+Object.defineProperty(AudioControls.prototype, 'volume', {
+    set: function set(value) {
+        if (!this.parent.isMobile) {
+            this.sounds.setMasterVolume(value);
+            this._volumeControlSlider.val.value = value;
+            this._volumeControlSlider.draw();
+        }
+    }
+});
+
+module.exports = AudioControls;
+
+},{"./MediaReadiness":3,"./audio/classic/sounds.js":10,"./audio/soundfont/sounds.js":12,"./util.js":24,"tone":65}],3:[function(require,module,exports){
+'use strict';
+
+// Unknown byte/decode progress stays indeterminate. This component never starts media.
+function MediaReadiness(className, label, retryLabel, retry) {
+    this.element = document.createElement('div');
+    this.element.className = className + ' media-readiness';
+    this.element.setAttribute('role', 'status');
+    this.element.setAttribute('aria-live', 'polite');
+    this.text = document.createElement('span');this.text.className = 'media-readiness-text';
+    this.bar = document.createElement('span');this.bar.className = 'media-readiness-bar';
+    this.bar.setAttribute('role', 'progressbar');this.bar.setAttribute('aria-label', label);
+    this.retry = document.createElement('button');this.retry.type = 'button';this.retry.textContent = retryLabel;
+    this.retry.className = 'media-readiness-retry';this.retry.addEventListener('click', retry);
+    this.element.append(this.text, this.bar, this.retry);
+    this.set('idle', '');
+}
+MediaReadiness.prototype.set = function (state, text) {
+    this.element.dataset.state = state;
+    this.element.setAttribute('aria-busy', String(state === 'loading'));
+    this.text.textContent = text;
+    this.bar.hidden = state !== 'loading';
+    this.retry.hidden = state !== 'error';
+};
+module.exports = MediaReadiness;
+
+},{}],4:[function(require,module,exports){
+'use strict';
+
+var migrate = require('./configurationMigrator');
+var catalog = require('../data/presets.json');
+function PresetPicker(app) {
+  var _this = this;
+
+  this.app = app;this.sequence = [];
+  this.container = document.createElement('div');this.container.className = 'preset-panel hidden';
+  this.showPresetsButton = document.getElementById('logo2');
+  this.showPresetsButton.setAttribute('role', 'button');this.showPresetsButton.tabIndex = 0;
+  this.showPresetsButton.addEventListener('click', function () {
+    return _this.toggleVisibility();
+  });
+  this.showPresetsButton.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();_this.toggleVisibility();
+    }
+  });
+}
+PresetPicker.prototype.init = function () {
+  var _this2 = this;
+
+  this.sequence = catalog.sequence.map(function (p) {
+    return Object.assign({}, p, { options: migrate(p.version, p.options) });
+  });
+  this.showPresetsButton.classList.remove('hidden');
+  var title = document.createElement('h2');title.textContent = catalog.title;this.container.appendChild(title);
+  var list = document.createElement('ul');this.container.appendChild(list);
+  this.sequence.forEach(function (p, i) {
+    var item = document.createElement('li'),
+        button = document.createElement('button'),
+        name = document.createElement('strong'),
+        prompt = document.createElement('p');
+    button.type = 'button';button.className = 'app-preset-link';name.textContent = p.name;prompt.textContent = p.prompt;
+    var preview = document.createElement('span'),
+        copy = document.createElement('span');preview.className = 'preset-preview';copy.className = 'preset-copy';
+    var media = document.createElement(i === 0 ? 'video' : 'img');media.className = 'preset-thumbnail';
+    if (i === 0) {
+      media.muted = true;media.playsInline = true;media.preload = 'metadata';media.tabIndex = -1;media.setAttribute('aria-hidden', 'true');media.dataset.previewSrc = 'https://apps.musedlab.org/virtualduet/cmsd/media/piano.mp4';media.addEventListener('loadedmetadata', function () {
+        media.currentTime = Math.min(1, media.duration / 2);
+      });
+    } else {
+      media.alt = '';media.dataset.previewSrc = 'https://i.ytimg.com/vi/R7iNSUoQ4Lk/mqdefault.jpg';
+    }
+    media.addEventListener('error', function () {
+      media.hidden = true;
+    });
+    var play = document.createElement('span');play.className = 'preset-play';play.textContent = '▶';play.setAttribute('aria-hidden', 'true');
+    preview.appendChild(media);preview.appendChild(play);copy.appendChild(name);copy.appendChild(prompt);button.appendChild(preview);button.appendChild(copy);button.addEventListener('click', function () {
+      return _this2.selectPreset(i, true);
+    });item.appendChild(button);list.appendChild(item);
+  });
+};
+PresetPicker.prototype.selectPreset = function (index, hide) {
+  var p = this.sequence[index];if (!p) return;
+  this.app.releaseNotes();document.dispatchEvent(new CustomEvent('aq:configuration'));
+  // All presets start from complete defaults, so missing fields cannot leak from another preset.
+  var o = JSON.parse(JSON.stringify(p.options));
+  var features = Object.assign({ layout: '1-3-5-8', scaleControls: true, allControls: true, audioEngine: 'soundfont', showVideo: true, showScore: false, showSounds: true, showKeyboard: true, useNoteCaps: true }, o.features);
+  this.app.configManager.onReload(Object.assign({ volume: .5, soundSlug: 'flute', scaleSlug: 'minor-pentatonic', midiRoot: 62, scoreSlug: null }, o, { features: features }));
+  this.currentIndex = index;this.showPresetsButton.textContent = p.name + ' · Presets';
+  if (hide) this.toggleVisibility(false);
+};
+PresetPicker.prototype.toggleVisibility = function (show) {
+  if (show == null) show = this.container.classList.contains('hidden');
+  if (show) this.container.querySelectorAll('[data-preview-src]').forEach(function (media) {
+    media.src = media.dataset.previewSrc;delete media.dataset.previewSrc;
+  });
+  this.container.classList.toggle('hidden', !show);this.showPresetsButton.setAttribute('aria-expanded', String(show));
+};
+module.exports = PresetPicker;
+
+},{"../data/presets.json":1,"./configurationMigrator":13}],5:[function(require,module,exports){
+'use strict';
+
+var Theory = require('./controller/theory.js');
+
+/**
+ * Scale Picker Control. Consists of two menus: one for scale type, and the other
+ * for scale within that type.
+ */
+var ScalePicker = function ScalePicker(parent) {
+    this.parent = parent;
+    this.keyMapper = parent.keyboard.mapping;
+
+    // Externally-visible properties
+    this._scaleSlug = '';
+
+    // Publicly-available DOM nodes
+    this.container;
+
+    // DOM Nodes
+    this._scaleTypeMenu;
+    this._scaleMenu;
+};
+
+ScalePicker.prototype = {
+    /**
+     * Initialize the two drop-down menus
+     */
+    init: function init() {
+        // Set up HTML container
+        this.container = document.createElement('div');
+        this.container.classList.add('scaleContainer');
+        this.container.classList.add('row');
+
+        // Set up Scale Type Menu
+        var scaleTypeContainer = document.createElement('div');
+        scaleTypeContainer.classList.add('optionMenu');
+        this.container.appendChild(scaleTypeContainer);
+
+        var scaleTypeLabel = document.createElement('label');
+        scaleTypeLabel.textContent = 'Scale Type';
+        scaleTypeContainer.appendChild(scaleTypeLabel);
+
+        this._scaleTypeMenu = document.createElement('select');
+        this._scaleTypeMenu.id = 'scaleTypeMenu';
+        scaleTypeContainer.appendChild(this._scaleTypeMenu);
+
+        for (var i = 0; i < Theory.scaleGroups.length; i++) {
+            var option = document.createElement('option');
+            option.value = Theory.scaleGroups[i].slug;
+            option.innerHTML = Theory.scaleGroups[i].name;
+            this._scaleTypeMenu.appendChild(option);
+        }
+
+        this._scaleTypeMenu.addEventListener('change', function (event) {
+            this._populateScaleMenu(event.target.value);
+            this._updateScale();
+            ga('send', 'event', 'scale-type', 'select', event.target.value);
+        }.bind(this));
+
+        // Set up Scale Menu
+        var scaleContainer = document.createElement('div');
+        scaleContainer.classList.add('optionMenu');
+        this.container.appendChild(scaleContainer);
+
+        var scaleLabel = document.createElement('label');
+        scaleLabel.textContent = 'Scale';
+        scaleContainer.appendChild(scaleLabel);
+
+        this._scaleMenu = document.createElement('select');
+        this._scaleMenu.id = 'scaleMenu';
+        scaleContainer.appendChild(this._scaleMenu);
+
+        this._scaleMenu.addEventListener('change', function (event) {
+            this._updateScale();
+            ga('send', 'event', 'scale', 'select', event.target.value);
+        }.bind(this));
+
+        this._populateScaleMenu(this._scaleTypeMenu.value);
+    },
+
+    /**
+     * A MIDI note identifying the root for the current scale
+     * @type {string}
+     */
+    isValidScale: function isValidScale(value) {
+        return !!Theory.slugToPitchSet[value];
+    },
+
+
+    get scale() {
+        return this._scale;
+    },
+
+    set scale(value) {
+        if (this._scale !== value) {
+            this._scale = value;
+
+            var pitchSet = Theory.slugToPitchSet[this._scale];
+            var scaleGroupSlug = '';
+
+            // Search through our pitch sets and find the one that contains our scale
+            for (var i = 0; i < Theory.scaleGroups.length; ++i) {
+                if (Theory.scaleGroups[i].pitchSets.indexOf(pitchSet) !== -1) {
+                    scaleGroupSlug = Theory.scaleGroups[i].slug;
+                    break;
+                }
+            }
+
+            // Update the scale type menu, if needed
+            if (this._scaleTypeMenu.value !== scaleGroupSlug) {
+                this._scaleTypeMenu.value = scaleGroupSlug;
+
+                this._populateScaleMenu(scaleGroupSlug);
+            }
+
+            // Update the scale menu
+            this._scaleMenu.value = this._scale;
+
+            // Update the key mapper
+            this.keyMapper.pitchSet = pitchSet;
+        }
+    },
+
+    toggleVisibility: function toggleVisibility(show) {
+        this.container.classList.toggle('hidden', !show);
+    },
+
+    /**
+     * [_populateScaleMenu description]
+     * @param  {[type]} scaleType [description]
+     * @return {[type]}           [description]
+     */
+    _populateScaleMenu: function _populateScaleMenu(scaleType) {
+        // Remove existing options
+        this._scaleMenu.innerHTML = '';
+
+        var pitchSets = Theory.slugToScaleGroup[scaleType].pitchSets;
+
+        for (var i = 0; i < pitchSets.length; i++) {
+            var pitchSet = pitchSets[i];
+
+            var option = document.createElement('option');
+            option.value = pitchSet.slug;
+            option.innerHTML = pitchSet.name ? pitchSet.name : Theory.slugToScale[pitchSet.scaleSlug].modeNames[pitchSet.mode];
+
+            this._scaleMenu.appendChild(option);
+        }
+
+        this._scaleMenu.selectedIndex = Theory.slugToScaleGroup[scaleType].defaultScaleIndex;
+    },
+
+    /**
+     * This function is used only when the scale is updated by the user (as opposed to through
+     * the scale property). It logs the fact that this update occurred to session/analytics/etc.
+     */
+    _updateScale: function _updateScale() {
+        this._scale = this._scaleMenu.value;
+
+        var pitchSet = Theory.slugToPitchSet[this._scale];
+
+        this.keyMapper.pitchSet = pitchSet;
+
+        this.parent.logUpdatedOption('scaleSlug', this._scale);
+        this.parent.sessionManager.logEvent('scale', this._scale);
+    }
+};
+
+module.exports = ScalePicker;
+
+},{"./controller/theory.js":17}],6:[function(require,module,exports){
+'use strict';
+
+/**
+ * Used for displaying a score image
+ */
+var Score = function Score(parent) {
+    this.parent = parent;
+
+    // Externally-visible properties
+    this._scoreSrc = null;
+
+    // Publicly-available DOM Node
+    this.container;
+
+    // DOM Nodes
+    this._scoreImage;
+};
+
+Score.prototype = {
+    /**
+     * Initialize the different UI elements attached to the score image
+     */
+    init: function init() {
+        this.container = document.createElement('div');
+        this.container.id = 'scoreImageContainer';
+
+        this._scoreImage = document.createElement('img');
+        this.container.appendChild(this._scoreImage);
+
+        this._scoreImage.addEventListener('load', this.parent.resize.bind(this.parent));
+    },
+
+    toggleVisibility: function toggleVisibility(show) {
+        this.container.classList.toggle('hidden', !show);
+    },
+
+    get scoreSrc() {
+        return this._scoreSrc;
+    },
+
+    set scoreSrc(value) {
+        if (this._scoreSrc !== value) {
+            this._scoreSrc = value;
+            this._scoreImage.src = this._scoreSrc;
+        }
+    }
+};
+
+module.exports = Score;
+
+},{}],7:[function(require,module,exports){
+'use strict';
+
+var MediaReadiness = require('./MediaReadiness');
+var CMSD_VIDEO = 'https://apps.musedlab.org/virtualduet/cmsd/media/piano.mp4';
+function parseVideo(value) {
+  value = String(value || '').trim();if (value === 'cmsd' || value === CMSD_VIDEO) return { id: 'cmsd', start: 0 };if (/^[\w-]{11}$/.test(value)) return { id: value, start: 0 };
+  try {
+    var u = new URL(value),
+        host = u.hostname.toLowerCase();if (!['https:', 'http:'].includes(u.protocol)) return null;var id = void 0;
+    if (host === 'youtu.be') id = u.pathname.split('/')[1];else if (['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtube-nocookie.com', 'www.youtube-nocookie.com'].includes(host)) {
+      var parts = u.pathname.split('/').filter(Boolean);id = parts[0] === 'watch' ? u.searchParams.get('v') : ['embed', 'shorts', 'live', 'v'].includes(parts[0]) ? parts[1] : null;
+    }
+    if (!/^[\w-]{11}$/.test(id || '')) return null;
+    var t = u.searchParams.get('t') || u.searchParams.get('start') || u.hash.replace(/^#t=/, '');var start = 0;
+    if (/^\d+(\.\d+)?$/.test(t)) start = Number(t);else {
+      var m = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/.exec(t);if (m) start = Number(m[1] || 0) * 3600 + Number(m[2] || 0) * 60 + Number(m[3] || 0);
+    }
+    return { id: id, start: Math.min(86400, start) };
+  } catch (_) {
+    return null;
+  }
+}
+var apiPromise = void 0;
+function loadAPI() {
+  if (window.YT && window.YT.Player) return Promise.resolve(window.YT);
+  if (apiPromise) return apiPromise;
+  apiPromise = new Promise(function (resolve, reject) {
+    var tag = document.createElement('script');tag.src = 'https://www.youtube.com/iframe_api';
+    var timeout = setTimeout(function () {
+      apiPromise = null;tag.remove();reject(new Error('YouTube did not respond. Check your connection and try Load video again.'));
+    }, 15000);
+    window.onYouTubeIframeAPIReady = function () {
+      clearTimeout(timeout);resolve(window.YT);
+    };
+    tag.onerror = function () {
+      clearTimeout(timeout);apiPromise = null;tag.remove();reject(new Error('YouTube could not load. You can still play the instrument.'));
+    };document.head.appendChild(tag);
+  });return apiPromise;
+}
+function Video(parent) {
+  this.parent = parent;this._enabled = true;this._videoSlug = '';this.generation = 0;this.start = 0;this.player = null;this.ready = false;this._showVideoURLControl = true;
+}
+Video.parseVideo = parseVideo;
+Video.prototype.init = function () {
+  var _this = this;
+
+  this.container = document.createElement('div');this.container.className = 'videoBlk';
+  var form = document.createElement('form');this.form = form;form.className = 'video-form';
+  this._videoURL = document.createElement('input');this._videoURL.type = 'text';this._videoURL.placeholder = 'YouTube link or video ID';this._videoURL.setAttribute('aria-label', 'YouTube link or video ID');
+  this.loadButton = document.createElement('button');this.loadButton.type = 'submit';this.loadButton.textContent = 'Load video';
+  form.appendChild(this._videoURL);form.appendChild(this.loadButton);this.container.appendChild(form);
+  this.readiness = new MediaReadiness('video-status', 'Loading video', 'Retry video', function () {
+    return _this.load();
+  });this.status = this.readiness.text;this.container.appendChild(this.readiness.element);
+  this.mount = document.createElement('div');this.mount.id = 'aq-youtube-player';this.container.appendChild(this.mount);
+  this.watch = document.createElement('a');this.watch.textContent = 'Open on YouTube ↗';this.watch.target = '_blank';this.watch.rel = 'noopener';this.container.appendChild(this.watch);
+  var returnKey = document.createElement('button');returnKey.type = 'button';returnKey.className = 'return-keyboard';returnKey.textContent = 'Return to keyboard';returnKey.addEventListener('click', function () {
+    return _this.parent.keyboard.keyboardContainer.focus({ preventScroll: true });
+  });this.container.appendChild(returnKey);
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();var parsed = parseVideo(_this._videoURL.value || _this._videoSlug);if (!parsed) {
+      _this.setStatus('notice', 'Enter a valid YouTube link or 11-character video ID.');return;
+    }_this.videoSlug = parsed.id;_this.start = parsed.start;_this.load();
+  });
+  var toggle = document.getElementById('videoToggle');toggle.tabIndex = 0;toggle.setAttribute('role', 'button');toggle.setAttribute('aria-label', 'Show or hide video');toggle.addEventListener('click', function () {
+    _this.enabled = !_this.enabled;
+  });
+  toggle.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();_this.enabled = !_this.enabled;
+    }
+  });
+};
+Video.prototype.setStatus = function (state, text) {
+  this.readiness.set(state, text);
+};
+Video.prototype.loadNative = function () {
+  var _this2 = this;
+
+  var retry = this.lastError === 'native';this.lastError = null;
+  this.setStatus('loading', 'Loading video metadata…');
+  if (!this.native) {
+    var _video = document.createElement('video');_video.controls = true;_video.playsInline = true;_video.loop = true;_video.preload = 'metadata';_video.src = CMSD_VIDEO;_video.setAttribute('aria-label', 'CMSD piano duet video');this.mount.replaceChildren(_video);this.native = _video;
+    var alive = function alive() {
+      return _this2.native === _video;
+    };
+    _video.addEventListener('error', function () {
+      if (alive()) {
+        _this2.lastError = 'native';_this2.setStatus('error', 'CMSD video could not load. You can still play the instrument.');
+      }
+    });
+    ['waiting', 'stalled'].forEach(function (type) {
+      return _video.addEventListener(type, function () {
+        if (alive() && !_video.paused) _this2.setStatus('loading', 'Buffering video…');
+      });
+    });
+    _video.addEventListener('canplay', function () {
+      if (alive() && !_video.error) _this2.setStatus('ready', _video.paused ? 'Video ready — press Play.' : 'Video ready.');
+    });
+    _video.addEventListener('playing', function () {
+      if (alive()) _this2.setStatus('playing', 'Playing · use the keyboard to play along');
+    });
+    _video.addEventListener('pause', function () {
+      if (alive() && !_video.error) _this2.setStatus('paused', 'Video paused — press Play to continue.');
+    });
+    this.player = { pauseVideo: function pauseVideo() {
+        return _video.pause();
+      }, playVideo: function playVideo() {
+        return _video.play().catch(function () {
+          if (alive()) _this2.setStatus('ready', 'Press Play in the video to begin.');
+        });
+      }, seekTo: function seekTo(t) {
+        _this2.start = t;if (_video.readyState >= 1) _video.currentTime = t;
+      }, getCurrentTime: function getCurrentTime() {
+        return _video.currentTime;
+      }, getPlayerState: function getPlayerState() {
+        return !_video.paused && _video.readyState >= 3 ? 1 : 2;
+      }, getVideoData: function getVideoData() {
+        return { video_id: 'cmsd' };
+      }, destroy: function destroy() {
+        _video.pause();_video.removeAttribute('src');_video.load();_video.remove();
+      } };
+  }
+  var video = this.native;
+  if (retry) video.load();
+  var begin = function begin() {
+    if (_this2.native !== video) return;video.currentTime = _this2.start || 0;_this2.ready = true;_this2.player.playVideo();
+  };
+  if (video.readyState >= 1) {
+    begin();return Promise.resolve();
+  }
+  if (this.loading) return this.loading;
+  this.loading = new Promise(function (resolve) {
+    var finish = function finish() {
+      clearTimeout(timer);video.removeEventListener('loadedmetadata', loaded);video.removeEventListener('error', failed);if (_this2.native === video) _this2.loading = null;resolve();
+    };
+    var loaded = function loaded() {
+      begin();finish();
+    };
+    var failed = function failed() {
+      if (_this2.native === video) {
+        _this2.lastError = 'native';_this2.setStatus('error', 'CMSD video could not load. You can still play the instrument.');
+      }finish();
+    };
+    var timer = setTimeout(failed, 15000);video.addEventListener('loadedmetadata', loaded, { once: true });video.addEventListener('error', failed, { once: true });
+  });return this.loading;
+};
+Video.prototype.load = function () {
+  var _this3 = this;
+
+  if (this._videoSlug === 'cmsd') return this.loadNative();
+  var generation = this.generation;
+  this.lastError = null;this.setStatus('loading', 'Loading YouTube…');
+  if (this.ready) {
+    this.player.loadVideoById({ videoId: this._videoSlug, startSeconds: this.start });this.setStatus('loading', 'Buffering video…');return Promise.resolve();
+  }
+  if (this.loading) return this.loading;
+  this.loading = loadAPI().then(function (YT) {
+    return new Promise(function (resolve, reject) {
+      if (generation !== _this3.generation) {
+        resolve();return;
+      }
+      var deadline = setTimeout(function () {
+        if (generation !== _this3.generation) {
+          resolve();return;
+        }_this3.ready = false;if (_this3.player) _this3.player.destroy();_this3.mount = document.createElement('div');_this3.mount.id = 'aq-youtube-player';_this3.container.insertBefore(_this3.mount, _this3.watch);reject(new Error('YouTube player did not become ready. Check your connection or open the video on YouTube.'));
+      }, 12000);
+      _this3.player = new YT.Player(_this3.mount, { width: '100%', height: 270, videoId: _this3._videoSlug, playerVars: { origin: location.origin, playsinline: 1, disablekb: 1, controls: 1, start: _this3.start }, events: {
+          onReady: function onReady(e) {
+            clearTimeout(deadline);if (generation !== _this3.generation) {
+              e.target.destroy();resolve();return;
+            }_this3.ready = true;_this3.loading = null;e.target.loadVideoById({ videoId: _this3._videoSlug, startSeconds: _this3.start });_this3.setStatus('ready', 'Press Play in the video to begin.');resolve();
+          },
+          onStateChange: function onStateChange(e) {
+            if (generation !== _this3.generation) return;if (e.data === 3) _this3.setStatus('loading', 'Buffering video…');else if (e.data === 1) _this3.setStatus('playing', 'Playing · use the keyboard to play along');else if (e.data === 2) _this3.setStatus('paused', 'Video paused — press Play to continue.');else if (e.data === 5 || e.data === 0) _this3.setStatus('ready', 'Press Play in the video to begin.');
+          },
+          onError: function onError(e) {
+            if (generation !== _this3.generation) return;_this3.lastError = e.data;var errors = { 2: 'Invalid video link.', 5: 'This browser cannot play this video.', 100: 'This video was removed or is private.', 101: 'YouTube is refusing embedded playback for this video.', 150: 'YouTube is refusing embedded playback for this video.', 153: 'YouTube could not identify this page. Open this preview directly in your browser.' };var message = (errors[e.data] || 'YouTube could not play this video.') + ' Try another video or open it on YouTube.';_this3.setStatus('error', message);if (!_this3.ready) {
+              clearTimeout(deadline);if (_this3.player) _this3.player.destroy();_this3.player = null;_this3.mount = document.createElement('div');_this3.mount.id = 'aq-youtube-player';_this3.container.insertBefore(_this3.mount, _this3.watch);reject(new Error(message));
+            }
+          },
+          onAutoplayBlocked: function onAutoplayBlocked() {
+            if (generation !== _this3.generation) return;_this3.setStatus('ready', 'Press Play in the video to begin.');
+          }
+        } });
+    });
+  }).catch(function (e) {
+    if (generation === _this3.generation) {
+      _this3.loading = null;_this3.setStatus('error', e.message);
+    }
+  });return this.loading;
+};
+Object.defineProperties(Video.prototype, {
+  videoSlug: {
+    get: function get() {
+      return this._videoSlug;
+    },
+    set: function set(value) {
+      var p = parseVideo(value);if (!p) return;var changed = p.id !== this._videoSlug,
+          native = p.id === 'cmsd';
+      if (changed && (this._videoSlug === 'cmsd' || native)) {
+        this.generation++;if (this.player) this.player.destroy();this.player = null;this.native = null;this.ready = false;this.loading = null;this.mount.remove();this.mount = document.createElement('div');this.mount.id = 'aq-youtube-player';this.container.insertBefore(this.mount, this.watch);
+      }
+      this._videoSlug = p.id;this.form.hidden = native;this.watch.href = native ? CMSD_VIDEO : 'https://www.youtube.com/watch?v=' + p.id;this.watch.textContent = native ? 'CMSD · Steve Wogaman · Open video ↗' : 'Open on YouTube ↗';this._videoURL.value = native ? CMSD_VIDEO : this.watch.href;
+      if (changed) {
+        this.lastError = null;this.start = 0;this.setStatus('notice', native ? 'CMSD piano duet · Composition and performance by Steve Wogaman.' : 'Video selected. Choose Load video to connect to YouTube.');if (this.ready && !native) this.player.cueVideoById(p.id, 0);if (native && this.container.dataset.playMode === 'video') this.load();
+      }
+      this.parent.logUpdatedOption('videoSlug', p.id);
+    }
+  },
+  enabled: {
+    get: function get() {
+      return this._enabled;
+    },
+    set: function set(v) {
+      this._enabled = !!v;this.container.style.display = v ? 'flex' : 'none';if (!v && this.ready) this.player.pauseVideo();
+    }
+  },
+  showVideoURLControl: {
+    get: function get() {
+      return this._showVideoURLControl;
+    },
+    set: function set(v) {
+      this._showVideoURLControl = v;
+    }
+  }
+});
+Video.prototype.resize = function () {};
+module.exports = Video;
+
+},{"./MediaReadiness":3}],8:[function(require,module,exports){
+'use strict';
+
+var Aqwertyon = require('./aqwertyon.js');
+window.aqTheory = require('./theory-modern');
+
+var configurationMigrator = require('./configurationMigrator.js');
+
+var env = 'preview';
+var sourceSlug = env == 'dev' ? 'dev' : env == 'test' ? 'uat' : 'pub'; // TODO: implement as AppBase.prototype.sourceSlug
+
+var audioEngineDefault = 'soundfont';
+
+// though supported, we can't assume soundfont assets are available offline, so don't default to what might fail
+if (Aqwertyon.prototype.isLocal) {
+    audioEngineDefault = 'classic'; // developer must manually comment this out to change default after adding soundfont assets to a MusEDBox
+}
+
+var sharedVideo = new URLSearchParams(location.search).get('video');
+var useCMSDDefault = !sharedVideo || sharedVideo === 'cmsd';
+var videoDefault = 'cmsd'; // Existing MusEDLab-hosted CMSD piano duet
+var soundDefault = audioEngineDefault == 'soundfont' ? 'flute' : 'bessie';
+var rootDefault = audioEngineDefault == 'soundfont' ? useCMSDDefault ? 66 : 62 : 50; // F-sharp4 for CMSD; legacy D4 for explicit YouTube links
+var presetsDefault = window.self == window.top ? 'HJ8BqlWJb' : ''; // Ethan's landing page; don't use if embedded
+
+window.appInfo = {
+    mainClass: Aqwertyon,
+
+    analytics: {
+        gaID: '',
+        hotjarID: parseInt(''),
+        isLocal: Aqwertyon.prototype.isLocal
+    },
+
+    deviceSupport: {
+        required: ['webAudio'],
+        excluded: [],
+        minimumSize: { width: 0, height: 0 },
+        custom: []
+    },
+
+    configuration: {
+        version: 2,
+
+        migrationFunction: configurationMigrator,
+
+        options: {
+            sourceSlug: { type: 'string', inTemplate: false, urlParam: 'source', inUI: false, default: sourceSlug },
+            userSlug: { type: 'string', inTemplate: false, urlParam: 'user', inUI: false },
+            sessionSlug: { type: 'string', inTemplate: false, urlParam: 'session', inUI: false },
+            cloneSession: { type: 'bool', inTemplate: false, urlParam: 'clone', inUI: false, default: false },
+            configure: { type: 'bool', inTemplate: false, urlParam: 'configure', inUI: false, default: false },
+            scoreSlug: { type: 'string', inTemplate: true, urlParam: 'score', inUI: false },
+            scaleSlug: { type: 'string', inTemplate: true, urlParam: 'scale', inUI: true, default: useCMSDDefault ? 'major-pentatonic' : 'minor-pentatonic' },
+            midiRoot: { type: 'int', inTemplate: true, urlParam: 'root', inUI: true, default: rootDefault },
+            videoSlug: { type: 'string', inTemplate: true, urlParam: 'video', inUI: true, default: videoDefault },
+            soundSlug: { type: 'string', inTemplate: true, urlParam: 'sound', inUI: true, default: soundDefault },
+            presetsSlug: { type: 'string', inTemplate: false, urlParam: 'presets', inUI: true, default: presetsDefault },
+            features: {
+                type: 'object',
+                properties: {
+                    audioEngine: { type: 'string', inTemplate: true, urlParam: 'audio-engine', inUI: false, default: audioEngineDefault, enum: ['none', 'classic', 'soundfont'] },
+                    showScore: { type: 'bool', inTemplate: true, urlParam: 'show-score', inUI: false, default: false },
+                    showVideo: { type: 'bool', inTemplate: true, urlParam: 'show-video', inUI: true, default: true },
+                    showKeyboard: { type: 'bool', inTemplate: true, urlParam: 'show-keyboard', inUI: false, default: true },
+                    showTakes: { type: 'bool', inTemplate: true, urlParam: 'show-takes', inUI: false, default: true },
+                    showSounds: { type: 'bool', inTemplate: true, urlParam: 'show-sounds', inUI: false, default: true },
+                    allControls: { type: 'bool', inTemplate: true, urlParam: 'controls', inUI: false, default: true },
+                    scaleControls: { type: 'bool', inTemplate: true, urlParam: 'scale-controls', inUI: false, default: true },
+                    layout: { type: 'string', inTemplate: true, urlParam: 'layout', inUI: false, default: '1-3-5-8' },
+                    labelMode: { type: 'string', inTemplate: true, urlParam: 'labels', inUI: true, default: '' },
+                    useNoteCaps: { type: 'bool', inTemplate: true, urlParam: 'notecaps', inUI: true, default: true },
+                    override: { type: 'bool', inTemplate: false, urlParam: 'override', inUI: false, default: false }
+                }
+            },
+            volume: { type: 'float', inTemplate: true, urlParam: 'volume', inUI: true, default: 0.5 }
+        }
+    }
+};
+
+},{"./aqwertyon.js":9,"./configurationMigrator.js":13,"./theory-modern":21}],9:[function(require,module,exports){
+'use strict';
+
+var _slicedToArray = function () { function sliceIterator(arr, i) { var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"]) _i["return"](); } finally { if (_d) throw _e; } } return _arr; } return function (arr, i) { if (Array.isArray(arr)) { return arr; } else if (Symbol.iterator in Object(arr)) { return sliceIterator(arr, i); } else { throw new TypeError("Invalid attempt to destructure non-iterable instance"); } }; }();
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _get = function get(object, property, receiver) { if (object === null) object = Function.prototype; var desc = Object.getOwnPropertyDescriptor(object, property); if (desc === undefined) { var parent = Object.getPrototypeOf(object); if (parent === null) { return undefined; } else { return get(parent, property, receiver); } } else if ("value" in desc) { return desc.value; } else { var getter = desc.get; if (getter === undefined) { return undefined; } return getter.call(receiver); } };
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+// External dependencies
+var MusED = require('mused-app-core');
+var Tone = require('tone');
+
+// General infrastructure modules
+var SessionManager = require('./sessionManager.js');
+var Timing = require('./timing.js');
+var MIDI = require('./makemidi.js');
+
+// Controls
+var AudioControls = require('./AudioControls.js');
+var Keyboard = require('./controller/Keyboard');
+var ScalePicker = require('./ScalePicker.js');
+var RootPicker = require('./controller/RootPicker');
+var PresetPicker = require('./PresetPicker.js');
+
+// Visualizations
+var Video = require('./Video.js');
+var Score = require('./Score.js');
+
+var Aqwertyon = function (_MusED$AppBase) {
+    _inherits(Aqwertyon, _MusED$AppBase);
+
+    _createClass(Aqwertyon, [{
+        key: 'isMobile',
+        get: function get() {
+            return _get(Aqwertyon.prototype.__proto__ || Object.getPrototypeOf(Aqwertyon.prototype), 'isMobile', this) || navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+        }
+    }]);
+
+    function Aqwertyon(configManager) {
+        _classCallCheck(this, Aqwertyon);
+
+        var _this = _possibleConstructorReturn(this, (Aqwertyon.__proto__ || Object.getPrototypeOf(Aqwertyon)).call(this, configManager));
+
+        var app = _this;
+
+        _this.imageHost = "https://s3.amazonaws.com/musedlab-aqwertyon/pwym/";
+        _this.sessionManager = new SessionManager(_this.options.sourceSlug);
+        _this.takesMenu = null;
+        _this.state = '';
+
+        // Controls
+        _this.keyboard = new Keyboard(_this);
+        _this.audioControls = new AudioControls(_this);
+        _this.scalePicker = new ScalePicker(_this);
+        _this.rootPicker = new RootPicker(_this);
+        _this.presetPicker = new PresetPicker(_this);
+
+        // Visualizations
+        _this.video = new Video(_this);
+        _this.scoreImage = new Score(_this);
+
+        _this.playingTake = false;
+        _this.timing = new Timing();
+        _this.timing.onProgress = _this.handleProgress.bind(_this);
+        _this.timing.setEventCallback('note', _this._simulateAttack.bind(_this), _this._simulateRelease.bind(_this));
+        _this.timing.setEventCallback('take', _this._handleTakeStart.bind(_this), _this._handleTakeEnd.bind(_this));
+
+        _this.init();
+        return _this;
+    }
+
+    _createClass(Aqwertyon, [{
+        key: 'init',
+        value: function init() {
+            MIDI.init();
+
+            if (this.isMobile) {
+                document.body.classList.add('mobile');
+            }
+
+            if (this.options.sessionSlug) {
+                var note = document.createElement('p');note.className = 'preview-label';
+                note.textContent = 'Historical sessions are not loaded in this preview. This instrument uses the link’s settings only.';
+                document.getElementById('main').before(note);
+            }
+            // Preview sessions and melodies stay local; never create or overwrite legacy CMS records.
+            this.sessionManager.offline = true;
+            this.sessionManager.logEvent = function () {};
+            this.sessionManager.saveOption = function () {};
+            this.initUI(false);
+        }
+    }, {
+        key: 'initUI',
+        value: function initUI(newSession) {
+            var self = this;
+
+            if (this.isEmbedded) {
+                document.body.classList.add('embed');
+            }
+
+            this.keyboard.init().then(function () {
+                // Old-style setup functions
+                //self.setupTakesMenu();
+
+                // New-style module inits
+                self.scalePicker.init();
+                self.rootPicker.init();
+                self.video.init();
+                self.scoreImage.init();
+
+                if (true) {
+                    // Presets also work on touch devices
+                    self.presetPicker.init(self.options.presetsSlug, newSession);
+                }
+
+                // Add Nexus UI Stylesheet
+                nx.addStylesheet();
+
+                $("#copy-shareURL").on('click', function (event) {
+                    $('#shareURL').select();
+
+                    if (document.execCommand('copy')) {
+                        // TODO: how to let the user know?
+                    } else {
+                        console.log('unable to copy');
+                    }
+                });
+
+                window.addEventListener('resize', self.resize.bind(self));
+
+                self.layout();
+                self.reconfigure();
+                document.dispatchEvent(new CustomEvent('aq:ready'));
+                self.updateShare();
+            });
+        }
+    }, {
+        key: 'resize',
+        value: function resize() {
+            // Resize AQ keyboard
+            // var keyWidth = document.getElementById('keyboardContainer').offsetWidth;
+            // if(keyWidth != this.aqKeyboard.width) {
+            //     var keyHeight = keyWidth * (268 / 960);
+            //     //this.aqKeyboard.resize(keyWidth, keyHeight);
+            //     this.volumeDial.resize(32, Math.min(120, keyHeight));
+            // }
+
+            // Resize root picker
+            // this.rootPicker.resize();
+
+
+            // Resize video
+            this.video.resize();
+
+            if (this.isEmbedded) {
+                parent.postMessage(document.body.offsetHeight, '*');
+            }
+        }
+    }, {
+        key: 'updateShare',
+        value: function updateShare() {
+            var u = new URL(location.href);['session', 'clone', 'user', 'source'].forEach(function (k) {
+                return u.searchParams.delete(k);
+            });
+            var input = document.getElementById('shareURL');if (input) input.value = u.href;
+        }
+    }, {
+        key: 'noteOn',
+        value: function noteOn(midiNote, buttonName) {
+            if (!Number.isInteger(midiNote) || midiNote < 0 || midiNote > 127) return;
+            if (window.aqNotebook && window.aqNotebook.replay.playing()) window.aqNotebook.stop();
+            if (Tone.context.state === 'suspended') Tone.context.resume();
+            if (this.audioControls.sounds._currInstrument === null) return;
+            this._held = this._held || new Map();var token = buttonName || String(midiNote);
+            if (this._held.has(token)) return;
+            var sounding = Array.from(this._held.values()).includes(midiNote);
+            this._held.set(token, midiNote);
+            if (!sounding) this.audioControls.noteOn(midiNote);
+            MIDI.send('attack', midiNote, 127);
+            document.dispatchEvent(new CustomEvent('aq:note', { detail: { type: 'on', midi: midiNote, code: token } }));
+        }
+    }, {
+        key: 'noteOff',
+        value: function noteOff(midiNote, buttonName) {
+            var token = buttonName || String(midiNote);this._held = this._held || new Map();
+            if (!this._held.has(token)) return;
+            midiNote = this._held.get(token);this._held.delete(token);
+            if (!Array.from(this._held.values()).includes(midiNote)) this.audioControls.noteOff(midiNote);
+            MIDI.send('release', midiNote, 0);
+            document.dispatchEvent(new CustomEvent('aq:note', { detail: { type: 'off', midi: midiNote, code: token } }));
+        }
+    }, {
+        key: 'releaseNotes',
+        value: function releaseNotes() {
+            var _this2 = this;
+
+            if (this._held) Array.from(this._held).forEach(function (_ref) {
+                var _ref2 = _slicedToArray(_ref, 2),
+                    code = _ref2[0],
+                    midi = _ref2[1];
+
+                return _this2.noteOff(midi, code);
+            });
+        }
+    }, {
+        key: 'setupTakesMenu',
+        value: function setupTakesMenu() {
+            this.takesMenu = document.getElementById('takesMenu');
+
+            this.takesMenu.addEventListener('change', this.takeSelected.bind(this));
+
+            var newTakeOption = document.createElement('option');
+            newTakeOption.innerHTML = 'New Take';
+            this.takesMenu.appendChild(newTakeOption);
+
+            for (var i = 0; i < this.sessionManager.eventLog.takes.length; i++) {
+                var takeOption = document.createElement('option');
+                takeOption.innerHTML = 'Take ' + (i + 1);
+                this.takesMenu.appendChild(takeOption);
+            }
+
+            this._updateAudioControls();
+        }
+
+        /**
+         * Update configuration changes to the URL and to the saved session.
+         * 
+         * @param  {string|array} option  Either a string for the name of the configuration
+         *                                parameter, or an array of strings if the parameter
+         *                                is part of a nested object
+         * @param  {*}            value   The new value to save for this parameter
+         */
+
+    }, {
+        key: 'logUpdatedOption',
+        value: function logUpdatedOption(option, value) {
+            if (this.state == 'recording') {
+                return; // ignore when recording
+            }
+
+            // We accept option names as strings for convenience, but then convert
+            // them to an array of one string, for consistency
+            if (typeof option === 'string') {
+                option = [option];
+            }
+
+            var target = this.options;for (var i = 0; i < option.length - 1; i++) {
+                target = target[option[i]];
+            }target[option[option.length - 1]] = value;
+            this.configManager.updateURLOption(option, value);
+            this.updateShare();
+
+            this.sessionManager.saveOption(option, value);
+        }
+    }, {
+        key: 'takeSelected',
+        value: function takeSelected() {
+            var takeNumber = this.takesMenu.selectedIndex - 1; // if takeNumber == -1, then we've got a New Take
+            var take = takeNumber >= 0 ? this.sessionManager.eventLog.takes[takeNumber] : this.sessionManager.currentTake;
+            var takeEvent = {
+                type: 'take',
+                start: 0,
+                end: take.end - take.start,
+                events: take.events
+            };
+
+            this.timing.clearEvents();
+            this.timing.currentTime = 0;
+            this.timing.duration = takeEvent.end;
+            this.timing.addEvents([takeEvent]);
+            this._updateAudioControls();
+        }
+    }, {
+        key: '_simulateAttack',
+        value: function _simulateAttack(noteEvent) {
+            //console.log('attack: ' + ' key: ' + noteEvent.data.keyCode + ' note: ' + noteEvent.data.midiNote);
+
+            var simulatedEvent = {
+                keyCode: noteEvent.data.keyCode,
+                metaKey: false,
+                location: noteEvent.data.keyCode == 16 ? noteEvent.data.midiNote : 0, // left/right shift key support
+                preventDefault: function preventDefault() {}
+            };
+
+            //this.aqKeyboard.typekey(simulatedEvent);
+        }
+    }, {
+        key: '_simulateRelease',
+        value: function _simulateRelease(noteEvent) {
+            //console.log('release: ' + ' key: ' + noteEvent.data.keyCode + ' note: ' + noteEvent.data.midiNote);
+
+            var simulatedEvent = {
+                keyCode: noteEvent.data.keyCode,
+                metaKey: false,
+                location: noteEvent.data.keyCode == 16 ? noteEvent.data.midiNote : 0, // left/right shift key support
+                preventDefault: function preventDefault() {}
+
+                //this.aqKeyboard.untype(simulatedEvent);
+            };
+        }
+    }, {
+        key: '_handleTakeStart',
+        value: function _handleTakeStart(takeEvent) {
+            console.log('take started');
+        }
+    }, {
+        key: '_handleTakeEnd',
+        value: function _handleTakeEnd(takeEvent) {
+            this.playButtonClicked();
+            this.takeSelected(); // ready to play again
+        }
+    }, {
+        key: 'handleProgress',
+        value: function handleProgress() {
+            this._updateAudioControls();
+
+            var percentDone = 100 * this.timing.currentTime / this.timing.duration;
+            //console.log('playing: ' + this.timing.currentTime);
+            //document.getElementById('progress').style['width'] = percentDone + '%';
+        }
+    }, {
+        key: '_updateAudioControls',
+        value: function _updateAudioControls() {
+            var timeLeftText = document.getElementById('timeLeft');
+            var timeLapsed = document.getElementById('timeLapsed');
+            var duration = this.timing.duration;
+            var currentTime = Math.round(this.timing.currentTime);
+            var remaining = Math.round(duration - currentTime);
+            var timeLeftSeconds = Math.floor(remaining % 60);
+            var timePassedSeconds = Math.floor(currentTime % 60);
+            var timeLeftMinutes = Math.floor(remaining / 60 % 60);
+            var timePassedMinutes = Math.floor(currentTime / 60 % 60);
+
+            timeLapsed.innerHTML = timePassedMinutes + ':' + (timePassedSeconds < 10 ? '0' : '') + timePassedSeconds + ' / ';
+            timeLeftText.innerHTML = timeLeftMinutes + ':' + (timeLeftSeconds < 10 ? '0' : '') + timeLeftSeconds;
+        }
+    }, {
+        key: 'flushNotes',
+        value: function flushNotes() {
+            for (var i in mySynth._activeVoices) {
+                if (mySynth._activeVoices[i]) {
+                    mySynth._activeVoices[i].triggerRelease();
+                }
+            }
+            this.currentTake.end = Tone.context.currentTime;
+        }
+    }, {
+        key: 'layout',
+        value: function layout() {
+            // TODO: Load this from an external file
+            var layout = void 0;
+            if (this.isMobile) {
+                layout = [['presetPicker'], ['video'], ['scalePicker', 'rootPicker'], ['keyboard'], ['soundPicker', 'noteCaps']];
+            } else {
+                layout = [['presetPicker'], ['video', 'score'], ['scalePicker', 'rootPicker'], ['volume', 'keyboard'], ['soundPicker', 'noteCaps']];
+            }
+
+            var namedNodes = {
+                keyboard: this.keyboard.keyboardContainer,
+                noteCaps: this.keyboard.noteCapToggle,
+                soundPicker: this.audioControls.soundPicker,
+                volume: this.audioControls.volumeControl,
+                scalePicker: this.scalePicker.container,
+                rootPicker: this.rootPicker.container,
+                video: this.video.container,
+                score: this.scoreImage.container,
+                presetPicker: this.presetPicker.container
+            };
+
+            var container = document.getElementById('main');
+
+            var _iteratorNormalCompletion = true;
+            var _didIteratorError = false;
+            var _iteratorError = undefined;
+
+            try {
+                for (var _iterator = layout[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+                    var row = _step.value;
+
+                    var rowNode = document.createElement('div');
+                    rowNode.classList.add('row');
+                    container.appendChild(rowNode);
+
+                    var _iteratorNormalCompletion2 = true;
+                    var _didIteratorError2 = false;
+                    var _iteratorError2 = undefined;
+
+                    try {
+                        for (var _iterator2 = row[Symbol.iterator](), _step2; !(_iteratorNormalCompletion2 = (_step2 = _iterator2.next()).done); _iteratorNormalCompletion2 = true) {
+                            var nodeName = _step2.value;
+
+                            rowNode.appendChild(namedNodes[nodeName]);
+                        }
+                    } catch (err) {
+                        _didIteratorError2 = true;
+                        _iteratorError2 = err;
+                    } finally {
+                        try {
+                            if (!_iteratorNormalCompletion2 && _iterator2.return) {
+                                _iterator2.return();
+                            }
+                        } finally {
+                            if (_didIteratorError2) {
+                                throw _iteratorError2;
+                            }
+                        }
+                    }
+                }
+            } catch (err) {
+                _didIteratorError = true;
+                _iteratorError = err;
+            } finally {
+                try {
+                    if (!_iteratorNormalCompletion && _iterator.return) {
+                        _iterator.return();
+                    }
+                } finally {
+                    if (_didIteratorError) {
+                        throw _iteratorError;
+                    }
+                }
+            }
+        }
+    }, {
+        key: 'reconfigure',
+        value: function reconfigure() {
+            var _this3 = this;
+
+            var features = this.options.features;
+
+            // ROOT
+            this.rootPicker.root = this.options.midiRoot;
+
+            // SCALE
+            this.scalePicker.scale = this.options.scaleSlug;
+
+            // LAYOUT & LABELS
+            this.keyboard.mapping.layout = features.layout;
+            this.keyboard.labelMode = features.labelMode || (features.useNoteCaps ? 'western' : 'keys');
+
+            // SOUND
+            this.audioControls.switchSound(this.options.soundSlug, features.audioEngine);
+            this.audioControls.volume = this.options.volume;
+
+            // VIDEO
+            this.video.enabled = features.showVideo;
+            this.video.videoSlug = this.options.videoSlug;
+            this.video.showVideoURLControl = features.allControls;
+
+            // SCORE
+            if (features.showScore) {
+                this.scoreImage.scoreSrc = this.imageHost + this.options.scoreSlug + '-aqw.png';
+            }
+            this.scoreImage.toggleVisibility(features.showScore);
+
+            // Share the selected musical configuration, not just its sound/video.
+            ['midiRoot', 'scaleSlug', 'soundSlug', 'videoSlug', 'volume'].forEach(function (k) {
+                return _this3.logUpdatedOption(k, _this3.options[k]);
+            });
+            ['layout', 'useNoteCaps', 'labelMode'].forEach(function (k) {
+                return _this3.logUpdatedOption(['features', k], features[k]);
+            });
+
+            // FEATURE REGIONS
+            this.scalePicker.toggleVisibility(features.allControls && features.scaleControls);
+            this.rootPicker.toggleVisibility(features.allControls && features.scaleControls);
+            this.audioControls.toggleSoundPicker(features.allControls && features.showSounds);
+
+            this.keyboard.keyboardIsHidden = features.showKeyboard;
+
+            this.resize();
+            setTimeout(this.resize.bind(this), 500); // HACK: additional resize needed for some deployments (e.g. CloudFlare or MusedBox)
+        }
+    }, {
+        key: 'recordButtonClicked',
+        value: function recordButtonClicked(e) {
+            var recBtn = document.getElementById('recButtonImg');
+            var timeLapsed = document.getElementById('timeLapsed');
+            var timeLeftText = document.getElementById('timeLeft');
+
+            var recordClock;
+            var recordingStartTime;
+
+            if (this.state === 'recording') {
+                this.sessionManager.saveTake();
+                // end record clock
+                this.state = '';
+
+                var takeNumber = this.takesMenu.querySelectorAll('option').length; // assume first option is 'New Take', so add 1
+
+                console.log(takeNumber);
+
+                var option = document.createElement('option');
+                option.innerHTML = 'Take ' + takeNumber;
+                this.takesMenu.appendChild(option);
+
+                this.takesMenu.selectedIndex = takeNumber;
+                this.takeSelected();
+
+                recBtn.src = 'img/aqwertyon_ux_record.png';
+
+                // stop recording clock
+                window.cancelAnimationFrame(recordClock);
+                timeLapsed.innerHTML = '0:00 / ';
+            } else {
+
+                // start record clock here
+                var _updateRecordClock = function _updateRecordClock(t) {
+                    var recMillis = t - recordingStartTime > 0 ? t - recordingStartTime : 0;
+                    var clockVal = recMillis / 1000;
+                    var timePassedSeconds = Math.round(clockVal % 60);
+                    var timePassedMinutes = Math.round(clockVal / 60 % 60);
+                    timeLapsed.innerHTML = timePassedMinutes + ':' + (timePassedSeconds < 10 ? '0' : '') + timePassedSeconds + ' / ';
+
+                    if (Math.round(recMillis / 8) % 2) {
+                        timeLapsed.style.backgroundColor = 'rgba(255, 100, 100, 0.2)';
+                        timeLeftText.style.backgroundColor = 'rgba(255, 100, 100, 0.2)';
+                    } else {
+                        timeLapsed.style.backgroundColor = 'rgba(255, 200,200, 0.2)';
+                        timeLeftText.style.backgroundColor = 'rgba(255, 200, 200, 0.2)';
+                    }
+
+                    if (self.state === 'recording') {
+                        recordClock = window.requestAnimationFrame(_updateRecordClock);
+                    } else {
+                        // revet
+                        timeLapsed.innerHTML = '0:00 / ';
+                        timeLapsed.style.backgroundColor = '';
+                        timeLeftText.style.backgroundColor = '';
+                    }
+                };
+
+                this.sessionManager.startTake();
+                var self = this;
+
+                recordingStartTime = window.performance.now();
+                timeLeftText.innerHTML = '0:00';
+                recordClock = window.requestAnimationFrame(_updateRecordClock);
+
+                this.state = 'recording';
+                recBtn.src = 'img/aqwertyon_ux_record_red.png';
+            }
+        }
+    }, {
+        key: 'playButtonClicked',
+        value: function playButtonClicked() {
+            var playBtn = document.getElementById('playButtonImg');
+
+            if (this.state === 'playingTake') {
+                this.timing.pause();
+                //    stopVideo();
+                playBtn.src = 'img/aqwertyon_ux_play-.png';
+                this.state = '';
+            } else if (this.state === '') {
+                this.state = 'playingTake';
+                this.timing.play();
+                //    playVideo();
+                playBtn.src = 'img/aqwertyon_ux_play-green.png';
+            } else {
+                // ignore; doing something else (like recording)
+            }
+        }
+    }]);
+
+    return Aqwertyon;
+}(MusED.AppBase);
+
+module.exports = Aqwertyon;
+
+},{"./AudioControls.js":2,"./PresetPicker.js":4,"./ScalePicker.js":5,"./Score.js":6,"./Video.js":7,"./controller/Keyboard":14,"./controller/RootPicker":15,"./makemidi.js":18,"./sessionManager.js":20,"./timing.js":23,"mused-app-core":72,"tone":65}],10:[function(require,module,exports){
+'use strict';
+
+var Tone = require('tone');
+var SynthPresets = require('./synthPresets.js');
+
+var Sounds = function Sounds() {
+    this.synth = null;
+    this.reverb = null;
+    this.distortion = null;
+    this.chorus = null;
+    this.chorus2 = null;
+    this.delay = null;
+    this.delay2 = null;
+    this.initialVolume = 1.0;
+
+    // Presets are defined in lib/Tone.Preset.js
+    this.instruments = [{
+        "slug": "punch",
+        "name": "Punch"
+    },
+    // {
+    //     "slug": "radard",
+    //     "name": "Radard"
+    // },
+    {
+        "slug": "the-90",
+        "name": "The90"
+    }, {
+        "slug": "pad-space",
+        "name": "PadSpace"
+    }, {
+        "slug": "rain",
+        "name": "Rain"
+    },
+    // {
+    //     "slug": "pianoetta",
+    //     "name": "Pianoetta"
+    // },
+    {
+        "slug": "bass",
+        "name": "Bass"
+    }, {
+        "slug": "bessie",
+        "name": "Bessie"
+    },
+    //{
+    //    "slug": "brass-circuit",
+    //    "name": "BrassCircuit"
+    //},
+    {
+        "slug": "brass-slow",
+        "name": "BrassSlow"
+    },
+    // {
+    //     "slug": "dist-git",
+    //     "name": "DistGit"
+    // },
+    {
+        "slug": "trumpet",
+        "name": "Trumpet"
+    }, {
+        "slug": "koto",
+        "name": "Koto"
+    }, {
+        "slug": "steely",
+        "name": "Steely"
+    },
+    // {
+    //     "slug": "organic",
+    //     "name": "Organic"
+    // },
+    {
+        "slug": "organ",
+        "name": "Organ"
+    }];
+
+    this.setupTone();
+};
+
+Sounds.prototype = {
+    setInstrument: function setInstrument(synthSlug) {
+        if (this.synth) {
+            this.synth.dispose();
+        }
+
+        var mySynth = null;
+
+        // presets and correspond with either FMSynth, DuoSynth or MonoSynth
+        switch (synthSlug) {
+            case 'koto':
+            case 'trumpet':
+            case 'dist-git':
+                mySynth = new Tone.PolySynth(10, Tone.FMSynth);
+                break;
+
+            case 'steely':
+            case 'organ':
+            case 'organic':
+                mySynth = new Tone.PolySynth(10, Tone.DuoSynth);
+                break;
+
+            case 'punch':
+                mySynth = new Tone.PolySynth(10, Tone.DuoSynth);
+                mySynth.connect(this.distortion);
+                mySynth.connect(this.delay);
+                break;
+
+            case 'radard':
+                mySynth = new Tone.PolySynth(10, Tone.DuoSynth);
+                mySynth.connect(this.chorus);
+                mySynth.connect(this.delay2);
+                break;
+
+            case 'the-90':
+                mySynth = new Tone.PolySynth(10, Tone.DuoSynth);
+                break;
+
+            case 'pad-space':
+                mySynth = new Tone.PolySynth(10, Tone.DuoSynth);
+                mySynth.connect(this.chorus2);
+                break;
+
+            case 'rain':
+                mySynth = new Tone.PolySynth(10, Tone.DuoSynth);
+                break;
+
+            default:
+                console.log('setting monosynth');
+                mySynth = new Tone.PolySynth(10, Tone.MonoSynth);
+                break;
+        }
+
+        if (SynthPresets[synthSlug]) {
+            mySynth.set(SynthPresets[synthSlug]);
+        } else {
+            console.log('no preset with the name ' + synthSlug);
+        }
+        mySynth.connect(this.EQ);
+
+        this.synth = mySynth;
+        return synthSlug;
+    },
+
+    setMasterVolume: function setMasterVolume(vol) {
+        var db = Tone.Master.gainToDb(vol);
+        Tone.Master.volume.value = db;
+    },
+
+    noteOn: function noteOn(midiNote) {
+        this.synth.triggerAttack(Tone.Frequency(midiNote, 'midi').eval());
+    },
+
+    noteOff: function noteOff(midiNote) {
+        this.synth.triggerRelease(Tone.Frequency(midiNote, 'midi').eval());
+    },
+
+    setupTone: function setupTone() {
+        // put reverb on everything
+        var myReverb = new Tone.Freeverb();
+        //myReverb.setPreset('coolRoom'); // TODO: no longer supported in Tone 6 - needed?
+        myReverb.wet.value = .32;
+        myReverb.toMaster();
+
+        //set up Tone Synth
+        var mySynth = new Tone.PolySynth(10, Tone.MonoSynth);
+
+        this.EQ = new Tone.EQ3();
+        this.EQ.lowFrequency.value = 140;
+        this.EQ.highFrequency.value = 3200;
+        this.EQ.low.value = -12;
+        this.EQ.mid.value = -6;
+        this.EQ.high.value = 12;
+
+        // add pitchBend to effects chain
+        this.pitchBend = new Tone.PitchShift();
+        Tone.Master.chain(this.pitchBend);
+
+        this.EQ.toMaster();
+        // mySynth.toMaster();
+
+        //distortion E1
+        var myDistortion = new Tone.Distortion(0.2);
+        // myDistortion.oversample = '2x';
+
+        //delay E1
+        var myDelay = new Tone.FeedbackDelay("50n", 0.2);
+
+        //myDelay.connect(myDistortion);
+        myDelay.toMaster();
+        myDistortion.connect(this.EQ);
+
+        //Chorus E2
+        var myChorus = new Tone.Chorus(10, 5, 1);
+        myChorus.connect(this.EQ);
+
+        //delay E2
+        var myDelay2 = new Tone.FeedbackDelay("20n", 0.75);
+        myDelay2.connect(this.EQ);
+
+        //Chorus E4
+        var myChorus4 = new Tone.Chorus(0.9, 3, 0.9);
+        myChorus4.connect(this.EQ);
+
+        //Phaser E4
+        var myPhaser4 = new Tone.Phaser(0.1, 8, 10);
+        myPhaser4.connect(this.EQ);
+
+        //FilmScore Reverb
+        var longReverb = new Tone.JCReverb();
+        longReverb.roomSize.value = 0.48;
+        longReverb.wet.value = 0.39;
+        longReverb.toMaster();
+
+        //Attack Envelope
+        var ampEnv1 = new Tone.AmplitudeEnvelope({
+            "attack": 0.0001,
+            "decay": 0.2,
+            "sustain": 1.0,
+            "release": 0.8
+        });
+
+        ampEnv1.connect(this.EQ);
+
+        this.synth = mySynth;
+        this.reverb = myReverb;
+        this.distortion = myDistortion;
+        this.chorus = myChorus;
+        this.chorus2 = myChorus4;
+        this.delay = myDelay;
+        this.delay2 = myDelay2;
+        this.filmReverb = longReverb;
+    }
+};
+
+module.exports = Sounds;
+
+},{"./synthPresets.js":11,"tone":65}],11:[function(require,module,exports){
+"use strict";
+
+/**
+ *  This module contains all of the synthPresets.
+ *  Create JS objects and assign them to the proper
+ *  slug at the bottom (module.exports = {slugs}).
+ */
+
+var Koto = {
+  "portamento": 0,
+  "harmonicity": 3.01,
+  "modulationIndex": 12.7,
+  "carrier": {
+    "volume": -12,
+    "portamento": 0,
+    "oscillator": {
+      "type": "triangle"
+    },
+    "filter": {
+      "Q": 2,
+      "type": "lowpass",
+      "rolloff": -12
+    },
+    "envelope": {
+      "attack": 0.01,
+      "decay": 2,
+      "sustain": 0,
+      "release": 0.8
+    },
+    "filterEnvelope": {
+      "attack": 0.06,
+      "decay": 0.07,
+      "sustain": 0.35,
+      "release": 0.8,
+      "min": 20000,
+      "max": 20000
+    }
+  },
+  "modulator": {
+    "volume": -1,
+    "portamento": 0,
+    "oscillator": {
+      "type": "sine"
+    },
+    "filter": {
+      "Q": 0,
+      "type": "lowpass",
+      "rolloff": -12
+    },
+    "envelope": {
+      "attack": 0.02,
+      "decay": 2,
+      "sustain": 0,
+      "release": 0.8
+    },
+    "filterEnvelope": {
+      "attack": 0.03,
+      "decay": 0.25,
+      "sustain": 0.7,
+      "release": 1,
+      "min": 20000,
+      "max": 20000
+    }
+  }
+};
+
+var Trumpet = {
+  "portamento": 0,
+  "harmonicity": 1,
+  "modulationIndex": 4,
+  "carrier": {
+    "volume": -15,
+    "portamento": 0,
+    "oscillator": {
+      "type": "square"
+    },
+    "filter": {
+      "Q": 2,
+      "type": "lowpass",
+      "rolloff": -12
+    },
+    "envelope": {
+      "attack": 0.01,
+      "decay": 1,
+      "sustain": 0.7,
+      "release": 0.4
+    },
+    "filterEnvelope": {
+      "attack": 0.06,
+      "decay": 0.07,
+      "sustain": 0.35,
+      "release": 0.8,
+      "min": 3000,
+      "max": 6500
+    }
+  },
+  "modulator": {
+    "volume": -6,
+    "portamento": 0,
+    "oscillator": {
+      "type": "triangle"
+    },
+    "filter": {
+      "Q": 0,
+      "type": "lowpass",
+      "rolloff": -12
+    },
+    "envelope": {
+      "attack": 0.15,
+      "decay": 0.3,
+      "sustain": 1,
+      "release": 1.5
+    },
+    "filterEnvelope": {
+      "attack": 0.03,
+      "decay": 0.25,
+      "sustain": 0.7,
+      "release": 1,
+      "min": 20000,
+      "max": 20000
+    }
+  }
+};
+
+var DistGit = {
+  "portamento": 0,
+  "harmonicity": 1,
+  "modulationIndex": 10,
+  "carrier": {
+    "volume": 0,
+    "portamento": 0,
+    "oscillator": {
+      "type": "square"
+    },
+    "filter": {
+      "Q": 2,
+      "type": "lowpass",
+      "rolloff": -12
+    },
+    "envelope": {
+      "attack": 0.001,
+      "decay": 3.3,
+      "sustain": 0,
+      "release": 1.2
+    },
+    "filterEnvelope": {
+      "attack": 0.05,
+      "decay": 0.15,
+      "sustain": 1,
+      "release": 1.5,
+      "min": 400,
+      "max": 4000
+    }
+  },
+  "modulator": {
+    "volume": -3,
+    "portamento": 0,
+    "oscillator": {
+      "type": "sine"
+    },
+    "filter": {
+      "Q": 1,
+      "type": "lowpass",
+      "rolloff": -48
+    },
+    "envelope": {
+      "attack": 0.3,
+      "decay": 0.4,
+      "sustain": 1,
+      "release": 1.7
+    },
+    "filterEnvelope": {
+      "attack": 0.02,
+      "decay": 0.02,
+      "sustain": 0.1,
+      "release": 1.5,
+      "min": 200,
+      "max": 200
+    }
+  }
+};
+
+var Steely = {
+  "vibratoAmount": 0.0,
+  "vibratoRate": 5,
+  "vibratoDelay": 1,
+  "portamento": 0,
+  "harmonicity": 1.99,
+  "voice0": {
+    "volume": -12,
+    "portamento": 0,
+    "oscillator": {
+      "type": "square"
+    },
+    "filter": {
+      "Q": 12,
+      "type": "lowpass",
+      "rolloff": -12
+    },
+    "envelope": {
+      "attack": 0.04,
+      "decay": 1,
+      "sustain": 0.01,
+      "release": 0.4
+    },
+    "filterEnvelope": {
+      "attack": 0.01,
+      "decay": 0.01,
+      "sustain": 0.35,
+      "release": 1,
+      "min": 400,
+      "max": 12000
+    }
+  },
+  "voice1": {
+    "volume": -6,
+    "portamento": 0,
+    "oscillator": {
+      "type": "sine"
+    },
+    "filter": {
+      "Q": 12,
+      "type": "lowpass",
+      "rolloff": -12
+    },
+    "envelope": {
+      "attack": 0.25,
+      "decay": 4,
+      "sustain": 0,
+      "release": 0.8
+    },
+    "filterEnvelope": {
+      "attack": 0.03,
+      "decay": 0.25,
+      "sustain": 0.7,
+      "release": 1,
+      "min": 1000,
+      "max": 2500
+    }
+  }
+};
+
+var Organ = {
+  "vibratoAmount": 0.5,
+  "vibratoRate": 5,
+  "vibratoDelay": 0,
+  "portamento": 0.001,
+  "harmonicity": 3.005,
+  "filter": {
+    "Q": 0.4,
+    "type": "lowpass",
+    "rolloff": -12
+  },
+  "voice0": {
+    "volume": -7,
+    "portamento": 0.01,
+    "oscillator": {
+      "type": "sine"
+    },
+    "envelope": {
+      "attack": 0.005,
+      "decay": 0.25,
+      "sustain": 0.4,
+      "release": 1.2
+    },
+    "filterEnvelope": {
+      "attack": 0.005,
+      "decay": 0.5,
+      "sustain": 0.7,
+      "release": 2,
+      "min": 800,
+      "max": 2200
+    }
+  },
+  "voice1": {
+    "volume": -5,
+    "portamento": 0.01,
+    "oscillator": {
+      "type": "sine"
+    },
+    "envelope": {
+      "attack": 0.25,
+      "decay": 4,
+      "sustain": 0.1,
+      "release": 0.8
+    },
+    "filterEnvelope": {
+      "attack": 0.005,
+      "decay": 0.5,
+      "sustain": 0.7,
+      "release": 2,
+      "min": 900,
+      "max": 4200
+    }
+  }
+};
+
+var Organic = {
+  "vibratoAmount": 0.3,
+  "vibratoRate": 3.5,
+  "harmonicity": 1.5,
+  "voice0": {
+    "volume": -6,
+    "oscillator": {
+      "frequency": 0,
+      "type": "sine"
+    },
+    "filter": {
+      "type": "lowpass",
+      "rolloff": -12,
+      "Q": 2.8
+    },
+    "envelope": {
+      "attack": 0.0070,
+      "decay": 0,
+      "sustain": 1,
+      "release": 0.056682076
+    },
+    "filterEnvelope": {
+      "min": 219.80,
+      "max": 1049.54942,
+      "exponent": 2,
+      "attack": 0.00704,
+      "decay": 0.0278,
+      "sustain": 0.065,
+      "release": 0.0749
+    }
+  },
+  "voice1": {
+    "volume": -20,
+    "oscillator": {
+      "type": "sine"
+    },
+    "filter": {
+      "type": "highpass",
+      "rolloff": -12,
+      "Q": 4.55
+    },
+    "envelope": {
+      "attack": 0.011,
+      "decay": 0.016,
+      "sustain": 0.7464,
+      "release": 0.074
+    },
+    "filterEnvelope": {
+      "min": 298.20,
+      "max": 80.43,
+      "exponent": 2,
+      "attack": 0.0035,
+      "decay": 0.0060,
+      "sustain": 1,
+      "release": 0.108
+    }
+  },
+  "portamento": 0
+};
+
+var Punch = {
+  "vibratoAmount": 0.1,
+  "vibratoRate": 5,
+  "vibratoDelay": 1,
+  "portamento": 0,
+  "harmonicity": 1.005,
+  "voice0": {
+    "volume": -6,
+    "portamento": 0,
+    "oscillator": {
+      "type": "sine"
+    },
+    "filter": {
+      "Q": 2,
+      "type": "highpass",
+      "rolloff": -12
+    },
+    "envelope": {
+      "attack": 0.02,
+      "decay": 0.03,
+      "sustain": 0.2,
+      "release": 0.3
+    },
+    "filterEnvelope": {
+      "attack": 0.025,
+      "decay": 0.05,
+      "sustain": 0.002,
+      "release": 0.3,
+      "min": 40,
+      "max": 340
+    }
+  },
+  "voice1": {
+    "volume": -20,
+    "portamento": 0,
+    "oscillator": {
+      "type": "sawtooth"
+    },
+    "filter": {
+      "Q": 0.5,
+      "type": "bandpass",
+      "frequency": 60,
+      "rolloff": -12
+    },
+    "envelope": {
+      "attack": 0.02,
+      "decay": 0.3,
+      "sustain": 0.05,
+      "release": 0.8
+    },
+    "filterEnvelope": {
+      "attack": 0.025,
+      "decay": 0.5,
+      "sustain": 0.001,
+      "release": 0.03,
+      "min": 1240,
+      "max": 1500
+    }
+  }
+};
+
+var Radard = {
+  "vibratoAmount": 0.1,
+  "vibratoRate": 5,
+  "vibratoDelay": 1,
+  "portamento": 0,
+  "harmonicity": 1.005,
+  "voice0": {
+    "volume": 30,
+    "portamento": 0,
+    "oscillator": {
+      "type": "sine"
+    },
+    "filter": {
+      "Q": 1,
+      "type": "highpass",
+      "rolloff": -12
+    },
+    "envelope": {
+      "attack": 0.01,
+      "decay": 0.3,
+      "sustain": 0,
+      "release": 0.1
+    },
+    "filterEnvelope": {
+      "attack": 1,
+      "decay": 0.05,
+      "sustain": 0.001,
+      "release": 0.1,
+      "min": 100,
+      "max": 10000
+    }
+  },
+  "voice1": {
+    "volume": -100,
+    "portamento": 0,
+    "oscillator": {
+      "type": "sawtooth"
+    },
+    "filter": {
+      "Q": 2,
+      "type": "lowpass",
+      "rolloff": -12
+    },
+    "envelope": {
+      "attack": 0.01,
+      "decay": 0.3,
+      "sustain": 0,
+      "release": 0.1
+    },
+    "filterEnvelope": {
+      "attack": 1,
+      "decay": 1,
+      "sustain": 0.001,
+      "release": 1,
+      "min": 100,
+      "max": 10000
+    }
+  }
+};
+
+var The90s = {
+  "vibratoAmount": 0.1,
+  "vibratoRate": 5,
+  "vibratoDelay": 1,
+  "portamento": 0,
+  "harmonicity": 1.005,
+  "voice0": {
+    "volume": -20,
+    "portamento": 0,
+    "oscillator": {
+      "type": "sine"
+    },
+    "filter": {
+      "Q": 30,
+      "type": "highpass",
+      "rolloff": -12
+    },
+    "envelope": {
+      "attack": 0.10,
+      "decay": 0.3,
+      "sustain": 0,
+      "release": 0.1
+    },
+    "filterEnvelope": {
+      "attack": 0.2,
+      "decay": 0.05,
+      "sustain": 0.01,
+      "release": 0.1,
+      "min": 700,
+      "max": 10000
+    }
+  },
+  "voice1": {
+    "volume": -6,
+    "portamento": 1,
+    "oscillator": {
+      "type": "sawtooth"
+    },
+    "filter": {
+      "Q": 7,
+      "type": "lowpass",
+      "rolloff": -12
+    },
+    "envelope": {
+      "attack": 0.01,
+      "decay": 0.3,
+      "sustain": 0,
+      "release": 0.1
+    },
+    "filterEnvelope": {
+      "attack": 0.3,
+      "decay": 1,
+      "sustain": 0.001,
+      "release": 1,
+      "min": 100,
+      "max": 10000
+    }
+  }
+};
+
+var PadSpace = {
+  "vibratoAmount": 0.1,
+  "vibratoRate": 5,
+  "vibratoDelay": 0,
+  "portamento": 0.001,
+  "harmonicity": 3.005,
+  "filter": {
+    "Q": 0.4,
+    "type": "lowpass",
+    "rolloff": -12
+  },
+  "voice0": {
+    "volume": 8,
+    "portamento": 0.01,
+    "oscillator": {
+      "type": "triangle"
+    },
+    "filter": {
+      "Q": 0.8,
+      "type": "bandpass",
+      "frequency": 600,
+      "rolloff": -12
+    },
+    "envelope": {
+      "attack": 9,
+      "decay": 0.1,
+      "sustain": 0.9,
+      "release": 2
+    },
+    "filterEnvelope": {
+      "attack": 0.01,
+      "decay": 0.01,
+      "sustain": 0.01,
+      "release": 1,
+      "min": 800,
+      "max": 2200
+    }
+  },
+  "voice1": {
+    "volume": 8,
+    "portamento": 0.01,
+    "oscillator": {
+      "type": "triangle"
+    },
+    "filter": {
+      "Q": 1,
+      "type": "lowpass",
+      "frequency": 7000,
+      "rolloff": -12
+    },
+    "envelope": {
+      "attack": 6,
+      "decay": 4,
+      "sustain": 0.1,
+      "release": 0.8
+    },
+    "filterEnvelope": {
+      "attack": 0.005,
+      "decay": 0.5,
+      "sustain": 0.7,
+      "release": 2,
+      "min": 900,
+      "max": 4200
+    }
+  }
+};
+
+var Rain = {
+  "vibratoAmount": 0.01,
+  "vibratoRate": 1.5,
+  "vibratoDelay": 0.02,
+  "portamento": 0.001,
+  "harmonicity": 3.1,
+  "filter": {
+    "Q": 1.4,
+    "type": "lowpass",
+    "rolloff": -12
+  },
+  "voice0": {
+    "volume": 15,
+    "portamento": 0.01,
+    "oscillator": {
+      "type": "sine"
+    },
+    "filter": {
+      "Q": 0.8,
+      "type": "bandpass",
+      "frequency": 600,
+      "rolloff": -12
+    },
+    "envelope": {
+      "attack": 0.4,
+      "decay": 0.2,
+      "sustain": 0.1,
+      "release": 1.2
+    },
+    "filterEnvelope": {
+      "attack": 0.01,
+      "decay": 0.01,
+      "sustain": 0.01,
+      "release": 1,
+      "min": 3000,
+      "max": 5200
+    }
+  },
+  "voice1": {
+    "volume": 0,
+    "portamento": 2.1,
+    "oscillator": {
+      "type": "sine"
+    },
+    "filter": {
+      "Q": 10,
+      "type": "lowpass",
+      "frequency": 7000,
+      "rolloff": -12
+    },
+    "envelope": {
+      "attack": 0.5,
+      "decay": 0.2,
+      "sustain": 0.1,
+      "release": 1.2
+    },
+    "filterEnvelope": {
+      "attack": 0.1,
+      "decay": 0.5,
+      "sustain": 0.7,
+      "release": 0.1,
+      "min": 2200,
+      "max": 6000
+    }
+  }
+};
+
+var Bass = {
+  "portamento": 0,
+  "oscillator": {
+    "type": "sine",
+    "volume": 3
+  },
+  "filter": {
+    "Q": 1,
+    "type": "lowpass",
+    "rolloff": -24
+  },
+  "envelope": {
+    "attack": 0.01,
+    "decay": 0.06,
+    "sustain": 0.4,
+    "release": 1
+  },
+  "filterEnvelope": {
+    "attack": 0.01,
+    "decay": 0.25,
+    "sustain": 0.6,
+    "release": 1.5,
+    "min": 60,
+    "max": 720
+  }
+};
+
+var Bessie = {
+  "portamento": 0.00,
+  "oscillator": {
+    "type": "sawtooth"
+  },
+  "filter": {
+    "Q": 3,
+    "type": "lowpass",
+    "rolloff": -24
+  },
+  "envelope": {
+    "attack": 0.01,
+    "decay": 0.03,
+    "sustain": 0.2,
+    "release": 0.8
+  },
+  "filterEnvelope": {
+    "attack": 0.045,
+    "decay": 0.7,
+    "sustain": 0.21,
+    "release": 0.5,
+    "min": 1245,
+    "max": 2250
+  }
+};
+
+var BrassSlow = {
+  "portamento": 0.1,
+  "oscillator": {
+    "type": "sawtooth"
+  },
+  "filter": {
+    "Q": 0.8,
+    "type": "lowpass",
+    "rolloff": -24
+  },
+  "envelope": {
+    "attack": 1.8,
+    "decay": 0.2,
+    "sustain": 0.01,
+    "release": 0.5
+  },
+  "filterEnvelope": {
+    "attack": 0.8,
+    "decay": 0.3,
+    "sustain": 0.8,
+    "release": 1.5,
+    "min": 1000,
+    "max": 3500
+  }
+};
+
+module.exports = {
+  'koto': Koto,
+  'trumpet': Trumpet,
+  'dist-git': DistGit,
+  'steely': Steely,
+  'organ': Organ,
+  'organic': Organic,
+  'punch': Punch,
+  'radard': Radard,
+  'the-90': The90s,
+  'pad-space': PadSpace,
+  'rain': Rain,
+  'bass': Bass,
+  'bessie': Bessie,
+  'brass-slow': BrassSlow
+};
+
+},{}],12:[function(require,module,exports){
+'use strict';
+
+var Tone = require('tone');
+var Soundfont = require('soundfont-player');
+var instrumentNames = require('soundfont-player/names/musyngkite.json');
+
+var Sounds = function Sounds() {
+    this._currInstrument = null;
+
+    this._volume = 0.5;
+
+    // Factor by which to multiply the gain
+    this._gainBoost = 6;
+
+    this.instruments = [];
+
+    this.defaultInstrument = 'flute';
+
+    this._loadedInstruments = {};
+    this._pendingInstruments = {};
+    this._activeNotes = {};
+
+    var _iteratorNormalCompletion = true;
+    var _didIteratorError = false;
+    var _iteratorError = undefined;
+
+    try {
+        for (var _iterator = instrumentNames[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+            var instrumentName = _step.value;
+
+            this.instruments.push({
+                slug: instrumentName,
+                name: instrumentName.replace(new RegExp('_', 'g'), ' ')
+            });
+
+            this._loadedInstruments[instrumentName] = null;
+        }
+    } catch (err) {
+        _didIteratorError = true;
+        _iteratorError = err;
+    } finally {
+        try {
+            if (!_iteratorNormalCompletion && _iterator.return) {
+                _iterator.return();
+            }
+        } finally {
+            if (_didIteratorError) {
+                throw _iteratorError;
+            }
+        }
+    }
+};
+
+Sounds.prototype = {
+    // for box build (NODE_LOCAL) use custom host path, otherwise use soundfont-player's default. TODO: our own cloud-based copy instead?
+    soundfontHost: 'false' == 'true' ? 'https://s3.amazonaws.com/musedlab-aqwertyon/' + 'soundfonts/' : 'https://gleitz.github.io/midi-js-soundfonts/',
+
+    // copy of soundfont-player's default nameToUrl using our build-specific host. TODO: support other sources as well?
+    nameToUrl: function nameToUrl(name, sf, format) {
+        format = format === 'ogg' ? format : 'mp3';
+        sf = sf === 'FluidR3_GM' ? sf : 'MusyngKite';
+
+        var url = Sounds.prototype.soundfontHost + sf + '/' + name + '-' + format + '.js';
+
+        return url;
+    },
+
+    setInstrument: function setInstrument(instrumentSlug) {
+        var _this = this;
+
+        // Check to see if the instrument slug is even valid
+        if (this._loadedInstruments[instrumentSlug] === undefined) {
+            // If not, choose a default instead
+            return this.setInstrument(this.defaultInstrument);
+        }
+
+        this._requestedInstrument = instrumentSlug;
+        if (this._loadedInstruments[instrumentSlug] !== null) {
+            this._setCurrInstrument(instrumentSlug);
+        } else {
+            this._report('loading', instrumentSlug);
+            if (!this._pendingInstruments[instrumentSlug]) {
+                this._pendingInstruments[instrumentSlug] = Soundfont.instrument(Tone.context, instrumentSlug, { soundfont: 'MusyngKite', nameToUrl: this.nameToUrl }).then(function (instrument) {
+                    delete _this._pendingInstruments[instrumentSlug];
+                    _this._loadedInstruments[instrumentSlug] = instrument;
+                    if (_this._requestedInstrument === instrumentSlug) _this._setCurrInstrument(instrumentSlug);
+                }, function (error) {
+                    delete _this._pendingInstruments[instrumentSlug];
+                    if (_this._requestedInstrument === instrumentSlug) _this._report('error', instrumentSlug);
+                });
+            }
+        }
+
+        return instrumentSlug;
+    },
+
+    _report: function _report(state, instrumentSlug) {
+        var detail = { state: state, instrument: instrumentSlug, previousAvailable: !!this._currInstrument, engine: this };
+        document.dispatchEvent(new CustomEvent('aq:sound-state', { detail: detail }));
+        // Preserve the older text event for existing listeners.
+        var text = state === 'loading' ? 'Loading ' + instrumentSlug.replace(/_/g, ' ') + '…' : state === 'ready' ? instrumentSlug.replace(/_/g, ' ') + ' ready' : 'Sound could not load. Check your connection or choose another sound.';
+        document.dispatchEvent(new CustomEvent('aq:sound', { detail: text }));
+    },
+
+    _setCurrInstrument: function _setCurrInstrument(instrumentSlug) {
+        var _this2 = this;
+
+        Object.keys(this._activeNotes).forEach(function (n) {
+            return _this2.noteOff(n);
+        });
+        this._currInstrument = this._loadedInstruments[instrumentSlug];
+        this._currInstrument.out.gain.value = this._volume * this._gainBoost;
+        this._report('ready', instrumentSlug);
+    },
+
+    setMasterVolume: function setMasterVolume(vol) {
+        this._volume = vol;
+
+        if (this._currInstrument) {
+            this._currInstrument.out.gain.value = this._volume * this._gainBoost;
+        }
+    },
+
+    createBackingInstrument: function createBackingInstrument() {
+        var _this3 = this;
+
+        var name = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 'acoustic_grand_piano';
+
+        this._backingPromises = this._backingPromises || {};
+        if (!this._backingPromises[name]) this._backingPromises[name] = Soundfont.instrument(Tone.context, name, { soundfont: 'MusyngKite', nameToUrl: this.nameToUrl }).then(function (instrument) {
+            instrument.out.gain.value = 1;return instrument;
+        }).catch(function (error) {
+            delete _this3._backingPromises[name];throw error;
+        });
+        return this._backingPromises[name];
+    },
+
+    noteOn: function noteOn(midiNote) {
+        // Don't play any notes if we haven't loaded any instruments yet
+        if (this._currInstrument === null) {
+            return;
+        }
+
+        if (midiNote in this._activeNotes) {
+            this.noteOff(midiNote);
+        }
+
+        this._activeNotes[midiNote] = this._currInstrument.play(midiNote);
+    },
+
+    noteOff: function noteOff(midiNote) {
+        if (midiNote in this._activeNotes) {
+            this._activeNotes[midiNote].stop();
+            delete this._activeNotes[midiNote];
+        }
+    }
+};
+
+module.exports = Sounds;
+
+},{"soundfont-player":62,"soundfont-player/names/musyngkite.json":64,"tone":65}],13:[function(require,module,exports){
+"use strict";
+
+// Accept both historical preset schemas without mutating their source records.
+function migrateConfig(version, input) {
+  var o = JSON.parse(JSON.stringify(input || {}));
+  o.features = o.features || {};
+  if (o.audio) {
+    o.volume = o.audio.volume;o.soundSlug = o.audio.soundSlug;o.features.audioEngine = o.audio.soundSet;delete o.audio;
+  }
+  if (o.video) {
+    o.videoSlug = o.video.videoSlug;o.features.showVideo = o.video.showVideo !== false;delete o.video;
+  }
+  return o;
+}
+module.exports = migrateConfig;
+
+},{}],14:[function(require,module,exports){
+'use strict';
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _get = function get(object, property, receiver) { if (object === null) object = Function.prototype; var desc = Object.getOwnPropertyDescriptor(object, property); if (desc === undefined) { var parent = Object.getPrototypeOf(object); if (parent === null) { return undefined; } else { return get(parent, property, receiver); } } else if ("value" in desc) { return desc.value; } else { var getter = desc.get; if (getter === undefined) { return undefined; } return getter.call(receiver); } };
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+var Util = require('mused-app-core/js/Util');
+var KeyMapper = require('./keyMapper');
+var ButtonGrid = require('mused-ui/widget/button-grid');
+
+var InstrumentGrid = function (_ButtonGrid) {
+    _inherits(InstrumentGrid, _ButtonGrid);
+
+    function InstrumentGrid() {
+        _classCallCheck(this, InstrumentGrid);
+
+        return _possibleConstructorReturn(this, (InstrumentGrid.__proto__ || Object.getPrototypeOf(InstrumentGrid)).apply(this, arguments));
+    }
+
+    _createClass(InstrumentGrid, [{
+        key: '_keyPressed',
+        value: function _keyPressed(event) {
+            var region = this.domNode.parentElement;
+            if (!region || !region.contains(document.activeElement) || event.key === 'Tab' || event.isComposing || event.target.isContentEditable || event.target.closest && event.target.closest('input,textarea,select,button,a,summary,[role="button"]')) return;
+            _get(InstrumentGrid.prototype.__proto__ || Object.getPrototypeOf(InstrumentGrid.prototype), '_keyPressed', this).call(this, event);
+        }
+    }, {
+        key: 'deactivate',
+        value: function deactivate() {
+            _get(InstrumentGrid.prototype.__proto__ || Object.getPrototypeOf(InstrumentGrid.prototype), 'deactivate', this).call(this);this._overlay.classList.add('hidden');
+        }
+    }]);
+
+    return InstrumentGrid;
+}(ButtonGrid);
+
+/**
+The Keyboard wraps around the keyboard component and controls the way that its
+keys are mapped, as well as cleaning up its output into a well-formed stream of
+midi note on and off events.
+*/
+
+
+var Keyboard = function Keyboard(parent) {
+    // Main references to other classes
+    this._parent = parent;
+    this.buttons = new InstrumentGrid();
+    this.mapping = new KeyMapper(this);
+
+    // Publicly-available properties
+    this._useCustomLabels = false;
+
+    // Publicly-available DOM nodes (these are available once init() is called)
+    this.keyboardContainer;
+    this.noteCapToggle;
+
+    // Private DOM nodes
+    this._noteCapToggleButton;
+
+    // Count of how many times different buttons have been attacked (without yet
+    // being released)
+    this._buttonCounts = [];
+
+    this._keymapURL = this._parent.isMobile ? 'data/keymap_mobile.json' : 'data/keymap.json';
+    this._keyTemplate;
+};
+
+Keyboard.prototype = {
+    init: function init() {
+        var _this2 = this;
+
+        // Set up the keyboard container
+        this.keyboardContainer = document.createElement('div');
+        this.keyboardContainer.id = 'keyboardContainer';
+        this.keyboardContainer.tabIndex = 0;
+        this.keyboardContainer.setAttribute('role', 'group');
+        this.keyboardContainer.setAttribute('aria-label', 'Musical keyboard');
+        this.keyboardContainer.setAttribute('aria-description', 'Click or tap a key to play. When this keyboard has focus, use the letter keys to play. Tab moves to the next control.');
+        this.buttons.domNode.tabIndex = -1;
+        this.buttons._overlay.remove();
+        this.keyboardContainer.appendChild(this.buttons.domNode);
+        // Pointer capture supports independent fingers and releases on cancellation.
+        var grid = this.buttons,
+            heldPointers = new Map(),
+            node = grid.domNode;
+        node.style.touchAction = 'none';
+        ['mousedown', 'touchstart', 'touchmove', 'touchend'].forEach(function (type) {
+            return node.addEventListener(type, function (e) {
+                e.preventDefault();e.stopImmediatePropagation();
+            }, { capture: true, passive: false });
+        });
+        var end = function end(e) {
+            var b = heldPointers.get(e.pointerId);if (b) b.release('pointer-' + e.pointerId);heldPointers.delete(e.pointerId);
+        };
+        node.addEventListener('pointerdown', function (e) {
+            if (e.button !== 0) return;
+            // A pointer gesture must also dismiss the focus/mobile overlay.
+            // Preventing the compatibility mousedown means it cannot do this for us.
+            _this2.keyboardContainer.focus({ preventScroll: true });
+            grid.activate();
+            var hit = document.elementFromPoint(e.clientX, e.clientY);
+            var target = hit && hit.closest('.mused-button');
+            var b = target && node.contains(target) && grid._buttonsById[target.id];
+            if (!b) return;e.preventDefault();node.setPointerCapture(e.pointerId);b.attack('pointer-' + e.pointerId);heldPointers.set(e.pointerId, b);
+        });
+        node.addEventListener('pointermove', function (e) {
+            if (!heldPointers.has(e.pointerId)) return;
+            var target = document.elementFromPoint(e.clientX, e.clientY);var el = target && target.closest('.mused-button');var b = el && node.contains(el) && grid._buttonsById[el.id];
+            if (b && b !== heldPointers.get(e.pointerId)) {
+                end(e);b.attack('pointer-' + e.pointerId);heldPointers.set(e.pointerId, b);
+            }
+        });
+        ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function (type) {
+            return node.addEventListener(type, end);
+        });
+        this.releaseAll = function () {
+            heldPointers.forEach(function (b, id) {
+                return b.release('pointer-' + id);
+            });heldPointers.clear();grid.deactivate();_this2._parent.releaseNotes();
+        };
+        this.keyboardContainer.addEventListener('focusin', function () {
+            return grid.activate();
+        });
+        this.keyboardContainer.addEventListener('focusout', function (e) {
+            if (!_this2.keyboardContainer.contains(e.relatedTarget)) _this2.releaseAll();
+        });
+        window.addEventListener('blur', function () {
+            return _this2.releaseAll();
+        });
+        window.addEventListener('focus', function () {
+            if (_this2.keyboardContainer.contains(document.activeElement)) grid.activate();
+        });
+        document.addEventListener('visibilitychange', function () {
+            if (document.hidden) _this2.releaseAll();else if (_this2.keyboardContainer.contains(document.activeElement)) grid.activate();
+        });
+        window.addEventListener('pagehide', function () {
+            return _this2.releaseAll();
+        });
+
+        // Set up the note cap button
+        this.noteCapToggle = document.createElement('div');
+        this.noteCapToggle.classList.add('optionMenu');
+
+        var label = document.createElement('span');label.textContent = 'Key labels';label.id = 'keyboard-labels-heading';
+        this.noteCapToggle.appendChild(label);
+        this._labelSelect = document.createElement('div');this._labelSelect.id = 'keyboard-labels';this._labelSelect.setAttribute('role', 'group');this._labelSelect.setAttribute('aria-labelledby', 'keyboard-labels-heading');this._labelSelect.title = 'Jianpu: 1 is the selected root; dots above or below mark higher or lower octaves.';
+        this._labelSelect.innerHTML = '<button type="button" data-label="keys" aria-pressed="false">Keys</button><button type="button" data-label="western" aria-pressed="false">Notes</button><button type="button" data-label="jianpu" aria-pressed="false">Jianpu</button>';
+        this.noteCapToggle.appendChild(this._labelSelect);
+        var pointerLabelChoice = false;
+        this._labelSelect.addEventListener('pointerdown', function (e) {
+            pointerLabelChoice = e.button === 0;
+        });
+        this._labelSelect.addEventListener('keydown', function () {
+            pointerLabelChoice = false;
+        });
+        this._labelSelect.addEventListener('pointercancel', function () {
+            pointerLabelChoice = false;
+        });
+        this._labelSelect.addEventListener('click', function (e) {
+            var button = e.target.closest('button[data-label]');if (!button) return;
+            var returnToPlaying = pointerLabelChoice || e.detail > 0;pointerLabelChoice = false;
+            _this2.releaseAll();_this2.labelMode = button.dataset.label;
+            _this2._parent.logUpdatedOption(['features', 'labelMode'], _this2.labelMode);
+            if (returnToPlaying) {
+                _this2.keyboardContainer.focus({ preventScroll: true });grid.activate();
+            }
+        });
+
+        // Load Key Map
+        var self = this;
+        var keymapPromise = new Promise(function (resolve, reject) {
+            Util.get(self._keymapURL).then(JSON.parse).then(function (data) {
+                self._keyTemplate = data;
+                self.buttons.applyTemplate(data, true);
+
+                resolve();
+            });
+        });
+
+        // Add listeners for the two types of button events we expect
+        this.buttons.addListener('midi', this._keyAttack.bind(this), this._keyRelease.bind(this));
+        this.buttons.addListener('transpose', this._transposeOn.bind(this), this._transposeOff.bind(this));
+
+        // Return a promise
+        return keymapPromise;
+    },
+
+    /**
+     * [useCustomLabels description]
+     * @type {boolean}
+     */
+    get useCustomLabels() {
+        return this._useCustomLabels;
+    },
+
+    set useCustomLabels(value) {
+        this.labelMode = value ? 'western' : 'keys';
+    },
+    get labelMode() {
+        return this._labelMode || 'keys';
+    },
+    set labelMode(value) {
+        var _this3 = this;
+
+        this._labelMode = ['keys', 'western', 'jianpu'].includes(value) ? value : 'keys';
+        this._useCustomLabels = this._labelMode !== 'keys';
+        if (this._labelSelect) {
+            this._labelSelect.value = this._labelMode;this._labelSelect.querySelectorAll('button').forEach(function (b) {
+                return b.setAttribute('aria-pressed', String(b.dataset.label === _this3._labelMode));
+            });
+        }
+        this.mapping.updateNoteLabels();
+    },
+
+    /**
+     * Determines whether or not the keyboard HTML is visible (independent of
+     * whether or not it has been added to the document).
+     * 
+     * @type {boolean}
+     */
+    get keyboardIsHidden() {
+        return this.keyboardContainer.classList.contains('hidden');
+    },
+
+    set keyboardIsHidden(value) {
+        this.keyboardContainer.classList.toggle('hidden', !value);
+    },
+
+    /**
+     * Determines whether or not the button for turning on and off the note caps
+     * is visible.
+     * 
+     * @type {boolean}
+     */
+    get noteCapToggleIsHidden() {
+        return this.noteCapToggle.classList.contains('hidden');
+    },
+
+    set noteCapToggleIsHidden(value) {
+        this.noteCapToggle.classList.toggle('hidden', !value);
+    },
+
+    _keyAttack: function _keyAttack(value, buttonName) {
+        this._buttonCounts[value] = this._buttonCounts[value] || 0;
+
+        this._parent.noteOn(value, buttonName);
+        this._buttonCounts[value] += 1;
+    },
+
+    _keyRelease: function _keyRelease(value, buttonName) {
+        this._buttonCounts[value] -= 1;
+        this._parent.noteOff(value, buttonName);
+    },
+
+    _transposeOn: function _transposeOn(value, buttonName) {
+        this._adjustTranspose(value);
+    },
+
+    _transposeOff: function _transposeOff(value, buttonName) {
+        this._adjustTranspose(-value);
+    },
+
+    _adjustTranspose: function _adjustTranspose(change) {
+        this.mapping.transposition = this.mapping.transposition + change;
+        this._parent.sessionManager.logEvent('transpose', this.mapping.transposition);
+
+        // Updating eventData already releases and retriggers held buttons.
+    }
+};
+
+module.exports = Keyboard;
+
+},{"./keyMapper":16,"mused-app-core/js/Util":69,"mused-ui/widget/button-grid":73}],15:[function(require,module,exports){
+'use strict';
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+var Theory = require('../theory-modern');
+
+var RootPicker = function () {
+  function RootPicker(parent) {
+    _classCallCheck(this, RootPicker);
+
+    this._parent = parent;this.keyMapper = parent.keyboard.mapping;this._root = 66;
+  }
+
+  _createClass(RootPicker, [{
+    key: 'init',
+    value: function init() {
+      var _this = this;
+
+      this.pickerContainer = document.createElement('div');this.pickerContainer.id = 'root-picker-container';
+      var control = function control(name, id) {
+        var wrap = document.createElement('div');wrap.className = 'optionMenu';var label = document.createElement('label');label.textContent = name;label.htmlFor = id;var select = document.createElement('select');select.id = id;wrap.append(label, select);_this.pickerContainer.append(wrap);return select;
+      };
+      this.rootMenu = control('Root', 'root-note-menu');this.octaveMenu = control('Octave', 'root-octave-menu');
+      Theory.roots.forEach(function (n, i) {
+        var o = document.createElement('option');o.value = i;o.textContent = Theory.pretty(n);_this.rootMenu.append(o);
+      });
+      for (var i = -1; i <= 9; i++) {
+        var o = document.createElement('option');o.value = i;o.textContent = i;this.octaveMenu.append(o);
+      }
+      var pointer = false;[this.rootMenu, this.octaveMenu].forEach(function (s) {
+        s.addEventListener('pointerdown', function () {
+          pointer = true;
+        });s.addEventListener('keydown', function () {
+          pointer = false;
+        });s.addEventListener('change', function () {
+          var value = (Number(_this.octaveMenu.value) + 1) * 12 + Number(_this.rootMenu.value);if (value > 127) {
+            _this.root = _this._root;return;
+          }
+          // Restore notebook's temporary settings before applying the selected root.
+          if (window.aqNotebook) window.aqNotebook.stop();_this._parent.releaseNotes();_this.root = value;_this._parent.logUpdatedOption('midiRoot', value);_this._parent.sessionManager.logEvent('root', value);
+          if (pointer) {
+            _this._parent.keyboard.keyboardContainer.focus({ preventScroll: true });_this._parent.keyboard.buttons.activate();
+          }pointer = false;
+        });
+      });this.root = this._root;
+    }
+  }, {
+    key: 'toggleVisibility',
+    value: function toggleVisibility(show) {
+      this.pickerContainer.classList.toggle('hidden', !show);
+    }
+  }, {
+    key: 'container',
+    get: function get() {
+      return this.pickerContainer;
+    }
+  }, {
+    key: 'root',
+    get: function get() {
+      return this._root;
+    },
+    set: function set(value) {
+      if (!Number.isInteger(value) || value < 0 || value > 127) return;this._root = value;this.keyMapper.root = value;if (this.rootMenu) {
+        this.rootMenu.value = String(value % 12);this.octaveMenu.value = String(Math.floor(value / 12) - 1);
+      }
+    }
+  }]);
+
+  return RootPicker;
+}();
+
+module.exports = RootPicker;
+
+},{"../theory-modern":21}],16:[function(require,module,exports){
+'use strict';
+
+var Theory = require('./theory.js');
+var ModernTheory = require('../theory-modern');
+
+/**
+ *  KeyMapper maintains a "key map": a (2D) array of interface elements (such as keys on a keyboard or any button grid).
+ *  The keys contain everything needed by a renderer or player.
+ * @param options
+ * @constructor
+ */
+var KeyMapper = function KeyMapper(parent) {
+    // Public mapping properties
+    this._root = 48; // C3
+    this._transposition = 0;
+    this._pitchSet = Theory.scaleGroups[0].pitchSets[0];
+    this._layout = [1, 3, 5, 8];
+
+    this._parent = parent;
+};
+
+KeyMapper.prototype = {
+    _parseLayoutString: function _parseLayoutString(layoutString) {
+        var values = undefined;
+
+        if (layoutString) {
+            values = layoutString.split('-');
+
+            if (values.length == this._layout.length) {
+                for (var i = 0; i < values.length; i++) {
+                    var value = null;
+
+                    if (values[i] !== 'x') {
+                        // lower-case 'x' signals exclude
+                        value = parseInt(values[i]);
+
+                        if (isNaN(value)) {
+                            values = undefined; // invalid; bail
+                            break;
+                        }
+                    }
+
+                    values[i] = value;
+                }
+            }
+        }
+
+        return values;
+    },
+
+    updateNoteAssignments: function updateNoteAssignments() {
+        for (var i = 0; i < this._layout.length; i++) {
+            if (this._layout[i]) {
+                var rowInterval = this._layout[i] - 1;
+                var octave = Math.floor(rowInterval / 7);
+                rowInterval = rowInterval % 7;
+
+                switch (rowInterval) {
+                    case 0:
+                        var intervals = this._pitchSet.roots;
+                        break;
+                    case 2:
+                        intervals = this._pitchSet.thirds;
+                        break;
+                    case 4:
+                        intervals = this._pitchSet.fifths;
+                        break;
+                    case 6:
+                        intervals = this._pitchSet.sevenths;
+                        break;
+                }
+            }
+
+            for (var j = 0; j <= 12; ++j) {
+                var button = this._parent.buttons.getButtonByName(j + '-' + i);
+
+                if (button) {
+                    if (this._layout[i]) {
+                        var degreeOffset = j % intervals.length;
+                        var degree = intervals[degreeOffset];
+
+                        var noteOctave = octave + Math.floor(j / intervals.length);
+
+                        var note = this._root + this._transposition + degree + 12 * noteOctave;
+                        button.eventData = note;
+                        button.disabled = false;
+                    } else {
+                        button.disabled = true;
+                    }
+                }
+            }
+        }
+
+        this.updateNoteLabels();
+    },
+
+    updateNoteLabels: function updateNoteLabels() {
+        var _this = this;
+
+        var mode = this._parent.labelMode;
+        var definitions = {};(this._parent._keyTemplate || []).forEach(function (row) {
+            return row.forEach(function (k) {
+                if (k.name) definitions[k.name] = k.label;
+            });
+        });
+        Object.keys(this._parent.buttons._buttonsByName).forEach(function (name) {
+            var b = _this._parent.buttons._buttonsByName[name];
+            if (b.eventType !== 'midi' || !Number.isInteger(b.eventData)) return;
+            var spelling = ModernTheory.spell(b.eventData, _this._root, _this._parent._parent.scalePicker.scale);
+            var note = ModernTheory.pretty(spelling.replace(/-?\d+$/, '')),
+                key = definitions[name] || '';
+            b._domNode.dataset.pitchName = spelling;
+            if (mode === 'jianpu') {
+                var delta = b.eventData - _this._root,
+                    pc = (delta % 12 + 12) % 12,
+                    octave = Math.floor(delta / 12);
+                b.label = '<span class="jianpu-upper">' + (octave > 0 ? '•'.repeat(octave) : '') + '</span><span class="jianpu-number">' + ['1', '♭2', '2', '♭3', '3', '4', '♯4', '5', '♭6', '6', '♭7', '7'][pc] + '</span><span class="jianpu-lower">' + (octave < 0 ? '•'.repeat(-octave) : '') + '</span>';
+                b._domNode.setAttribute('aria-label', spelling + ' · ' + key);
+            } else b.label = mode === 'keys' ? key : note;
+            var plain = document.createElement('span');plain.innerHTML = note;
+            b._domNode.dataset.secondary = mode === 'keys' ? plain.textContent : key;
+            var primary = document.createElement('span');primary.className = 'key-main';while (b._domNode.firstChild) {
+                primary.appendChild(b._domNode.firstChild);
+            }b._domNode.appendChild(primary);
+            b._domNode.classList.add('theory-key');b._domNode.classList.toggle('jianpu-key', mode === 'jianpu');
+        });
+    }
+};
+
+Object.defineProperty(KeyMapper.prototype, 'pitchSet', {
+    set: function set(value) {
+        this._pitchSet = value;
+
+        this.updateNoteAssignments();
+    },
+    get: function get() {
+        return this._pitchSet;
+    }
+});
+
+Object.defineProperty(KeyMapper.prototype, 'root', {
+    set: function set(value) {
+        this._root = value;
+
+        this.updateNoteAssignments();
+    },
+    get: function get() {
+        return this._root;
+    }
+});
+
+Object.defineProperty(KeyMapper.prototype, 'transposition', {
+    set: function set(value) {
+        if (value != this._transposition) {
+            this._transposition = value;
+
+            this.updateNoteAssignments();
+        }
+    },
+    get: function get() {
+        return this._transposition;
+    }
+});
+
+Object.defineProperty(KeyMapper.prototype, 'layout', {
+    set: function set(layoutString) {
+        // TODO: check if changed, but pending existence of layout object?
+        var values = this._parseLayoutString(layoutString);
+
+        if (values) {
+            this._layout = values;
+            this.updateNoteAssignments();
+        } else {
+            console.log('invalid layout string: ' + layoutString);
+        }
+    }
+});
+
+module.exports = KeyMapper;
+
+},{"../theory-modern":21,"./theory.js":17}],17:[function(require,module,exports){
+"use strict";
+
+var MusEDTheory = function MusEDTheory() {
+    var self = this;
+
+    this.tones = [{ degree: 0, name: "C", enharmonic: false }, { degree: 1, name: "C#/Db", enharmonic: true }, { degree: 2, name: "D", enharmonic: false }, { degree: 3, name: "D#/Eb", enharmonic: true }, { degree: 4, name: "E", enharmonic: false }, { degree: 5, name: "F", enharmonic: false }, { degree: 6, name: "F#/Gb", enharmonic: true }, { degree: 7, name: "G", enharmonic: false }, { degree: 8, name: "G#/Ab", enharmonic: true }, { degree: 9, name: "A", enharmonic: false }, { degree: 10, name: "A#/Bb", enharmonic: true }, { degree: 11, name: "B", enharmonic: false }];
+
+    this.noteNames = ["C", "C# / Db", "D", "D# / Eb", "E", "F", "F# / Gb", "G", "G# / Ab", "A", "A# / Bb", "B"];
+    this.keyToNote = {}; // C8  == 108
+    this.noteToKey = {}; // 108 ==  C8
+    this.noteToPitchClass = {}; // 108 ==   C
+
+    // Fix note name formatting
+    for (var i = 0; i < this.noteNames.length; ++i) {
+        this.noteNames[i] = this.noteNames[i].replace('b', '<span class="accidental flat">&#9837;</span>');
+        this.noteNames[i] = this.noteNames[i].replace('#', '<span class="accidental sharp">&#9839;</span>');
+    }
+
+    (function () {
+        var A0 = 0x15; // first note
+        var C8 = 0x6C; // last note
+
+        for (var n = A0; n <= C8; n++) {
+            var pitchClass = self.noteNames[n % 12];
+            var octave = (n - 12) / 12 >> 0;
+            var noteName = pitchClass + octave;
+
+            self.keyToNote[noteName] = n;
+            self.noteToKey[n] = noteName;
+            self.noteToPitchClass[n] = pitchClass;
+        }
+    })();
+
+    // TODO switch pitchSet / scale terminology?
+
+    this.scaleGroups = [{
+        slug: 'major',
+        name: 'Major',
+        defaultScaleIndex: 3, // Major scale
+        pitchSets: [{ slug: 'harmonic-major', scaleSlug: 'harmonic-major', mode: 0,
+            roots: [0, 2, 4, 5, 7, 8, 11],
+            thirds: [4, 5, 7, 8, 11, 12, 14],
+            fifths: [7, 8, 11, 12, 14, 16, 17],
+            sevenths: [11, 12, 14, 16, 17, 19, 20]
+        }, { slug: 'lydian', scaleSlug: 'major', mode: 3,
+            roots: [0, 2, 4, 6, 7, 9, 11],
+            thirds: [4, 6, 7, 9, 11, 12, 14],
+            fifths: [7, 9, 11, 12, 14, 16, 18],
+            sevenths: [11, 12, 14, 16, 18, 19, 21]
+        }, { slug: 'lydian-dominant', scaleSlug: 'melodic-minor', mode: 3,
+            roots: [0, 2, 4, 6, 7, 9, 10],
+            thirds: [4, 6, 7, 9, 10, 12, 14],
+            fifths: [7, 9, 10, 12, 14, 16, 18],
+            sevenths: [10, 12, 14, 16, 18, 19, 21]
+        }, { slug: 'major', scaleSlug: 'major', mode: 0, name: 'Major',
+            roots: [0, 2, 4, 5, 7, 9, 11],
+            thirds: [4, 5, 7, 9, 11, 12, 14],
+            fifths: [7, 9, 11, 12, 14, 16, 17],
+            sevenths: [11, 12, 14, 16, 17, 19, 21]
+        }, { slug: 'major-blues', scaleSlug: 'blues', mode: 5,
+            roots: [0, 2, 3, 4, 7, 9],
+            thirds: [4, 5, 6, 7, 11, 12],
+            fifths: [7, 9, 9, 10, 14, 16],
+            sevenths: [10, 12, 12, 12, 17, 19]
+        }, { slug: 'major-pentatonic', scaleSlug: 'major-pentatonic', mode: 0,
+            roots: [0, 2, 4, 7, 9],
+            thirds: [4, 7, 9, 12, 14],
+            fifths: [9, 12, 14, 16, 19],
+            sevenths: [14, 16, 19, 21, 24]
+        }, { slug: 'mixolydian', scaleSlug: 'major', mode: 4,
+            roots: [0, 2, 4, 5, 7, 9, 10],
+            thirds: [4, 5, 7, 9, 10, 12, 14],
+            fifths: [7, 9, 10, 12, 14, 16, 17],
+            sevenths: [10, 12, 14, 16, 17, 19, 21] }, { slug: 'phrygian-dominant', scaleSlug: 'harmonic-minor', mode: 4,
+            roots: [0, 1, 4, 5, 7, 8, 10],
+            thirds: [4, 5, 7, 8, 10, 12, 13],
+            fifths: [7, 8, 10, 12, 13, 16, 17],
+            sevenths: [10, 12, 13, 16, 17, 19, 20]
+        }]
+    }, {
+        slug: 'minor',
+        name: 'Minor',
+        defaultScaleIndex: 5, // Natural Minor
+        pitchSets: [{ slug: 'dorian', scaleSlug: 'major', mode: 1,
+            roots: [0, 2, 3, 5, 7, 9, 10],
+            thirds: [3, 5, 7, 9, 10, 12, 14],
+            fifths: [7, 9, 10, 12, 14, 15, 17],
+            sevenths: [10, 12, 14, 15, 17, 19, 21] }, { slug: 'harmonic-minor', scaleSlug: 'harmonic-minor', mode: 0,
+            roots: [0, 2, 3, 5, 7, 8, 11],
+            thirds: [3, 5, 7, 8, 11, 12, 14],
+            fifths: [7, 8, 11, 12, 14, 15, 17],
+            sevenths: [11, 12, 14, 15, 17, 19, 20]
+        }, { slug: 'locrian', scaleSlug: 'major', mode: 6,
+            roots: [0, 1, 3, 5, 6, 8, 10],
+            thirds: [3, 5, 6, 8, 10, 12, 13],
+            fifths: [6, 8, 10, 12, 13, 15, 17],
+            sevenths: [10, 12, 13, 15, 17, 18, 20]
+        }, { slug: 'melodic-minor', scaleSlug: 'melodic-minor', mode: 0,
+            roots: [0, 2, 3, 5, 7, 9, 11],
+            thirds: [3, 5, 7, 9, 11, 12, 14],
+            fifths: [7, 9, 11, 12, 14, 15, 17],
+            sevenths: [11, 12, 14, 15, 17, 19, 21]
+        }, { slug: 'minor-pentatonic', scaleSlug: 'major-pentatonic', mode: 4,
+            roots: [0, 3, 5, 7, 10],
+            thirds: [5, 7, 10, 12, 15],
+            fifths: [10, 12, 15, 17, 19],
+            sevenths: [15, 17, 19, 22, 24]
+        }, { slug: 'natural-minor', scaleSlug: 'major', mode: 5, name: 'Natural Minor',
+            roots: [0, 2, 3, 5, 7, 8, 10],
+            thirds: [3, 5, 7, 8, 10, 12, 14],
+            fifths: [7, 8, 10, 12, 14, 15, 17],
+            sevenths: [10, 12, 14, 15, 17, 19, 20]
+        }, { slug: 'phrygian', scaleSlug: 'major', mode: 2,
+            roots: [0, 1, 3, 5, 7, 8, 10],
+            thirds: [3, 5, 7, 8, 10, 12, 13],
+            fifths: [7, 8, 10, 12, 13, 15, 17],
+            sevenths: [10, 12, 13, 15, 17, 19, 20]
+        }]
+    }, {
+        slug: 'other',
+        name: 'Other',
+        defaultScaleIndex: 1, // Blues
+        pitchSets: [{ slug: 'altered', scaleSlug: 'melodic-minor', mode: 6, name: 'Altered',
+            roots: [0, 1, 3, 4, 6, 8, 10],
+            thirds: [3, 4, 6, 8, 10, 12, 13],
+            fifths: [6, 8, 10, 12, 13, 15, 16],
+            sevenths: [10, 12, 13, 15, 16, 18, 20]
+        }, { slug: 'blues', scaleSlug: 'blues', mode: 0,
+            roots: [0, 3, 5, 6, 7, 10],
+            thirds: [4, 7, 9, 9, 11, 14],
+            fifths: [7, 10, 12, 12, 14, 17],
+            sevenths: [10, 13, 15, 15, 17, 20]
+        }, { slug: 'blues-octaves', scaleSlug: 'blues-octaves', mode: 0,
+            roots: [0, 3, 5, 6, 7, 10],
+            thirds: [12, 15, 17, 18, 19, 22],
+            fifths: [24, 27, 29, 30, 31, 34],
+            sevenths: [36, 39, 41, 42, 43, 46]
+        }, { slug: 'kansas-city', scaleSlug: 'kansas-city', mode: 0,
+            roots: [0, 2, 5, 7, 8],
+            thirds: [4, 6, 9, 11, 12],
+            fifths: [7, 9, 12, 14, 14],
+            sevenths: [10, 12, 15, 17, 14]
+        }, { slug: 'chromatic', scaleSlug: 'chromatic', mode: 0,
+            roots: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+            thirds: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+            fifths: [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
+            sevenths: [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
+        }, { slug: 'diminished', scaleSlug: 'octatonic', mode: 1,
+            roots: [0, 1, 3, 4, 6, 7, 9, 10],
+            thirds: [3, 4, 6, 7, 9, 10, 12, 13],
+            fifths: [6, 7, 9, 10, 12, 13, 15, 16],
+            sevenths: [9, 10, 12, 13, 15, 16, 18, 19]
+        }, { slug: 'octatonic', scaleSlug: 'octatonic', mode: 0,
+            roots: [0, 2, 3, 5, 6, 8, 9, 11],
+            thirds: [3, 5, 6, 8, 9, 11, 12, 14],
+            fifths: [6, 8, 9, 11, 12, 14, 15, 17],
+            sevenths: [9, 11, 12, 14, 15, 17, 18, 20]
+        }, { slug: 'supermode', scaleSlug: 'supermode', mode: 0,
+            roots: [0, 2, 3, 4, 5, 7, 8, 9, 10, 11],
+            thirds: [4, 5, 7, 7, 9, 11, 12, 12, 14, 14],
+            fifths: [7, 9, 10, 11, 12, 14, 15, 16, 17, 17],
+            sevenths: [10, 12, 14, 14, 15, 17, 19, 19, 21, 21]
+        }, { slug: 'whole-tone', scaleSlug: 'whole-tone', mode: 0,
+            roots: [0, 2, 4, 6, 8, 10],
+            thirds: [4, 6, 8, 10, 12, 14],
+            fifths: [8, 10, 12, 14, 16, 18],
+            sevenths: [10, 12, 14, 16, 18, 20]
+        }]
+    }];
+
+    this.scales = [{
+        slug: 'major',
+        name: 'Major',
+        scaleDegrees: [0, 2, 4, 5, 7, 9, 11],
+        majorRelations: [0, 2, 4, 5, 7, 9, 11],
+        intervals: [0, 2, 2, 1, 2, 2, 2, 1],
+        modeNames: ['Ionian', 'Dorian', 'Phrygian', 'Lydian', 'Mixolydian', 'Aeolian', 'Locrian']
+    }, {
+        slug: 'major-pentatonic',
+        name: 'Major Pentatonic',
+        scaleDegrees: [0, 2, 4, 7, 9],
+        majorRelations: [0, 2, 4, 7, 9],
+        intervals: [0, 3, 2, 2, 3, 2],
+        modeNames: ['Major Pentatonic', '2', '3', '4', 'Minor Pentatonic']
+    }, {
+        slug: 'blues-octaves',
+        name: 'Blues (Scale)',
+        scaleDegrees: [0, 3, 5, 6, 7, 10],
+        majorRelations: [0, 4, 5, 5, 7, 11],
+        intervals: [0, 3, 2, 1, 1, 3, 2],
+        modeNames: ['Blues (Scale)', '2', '3', '4', '5', 'Major Blues']
+    }, {
+        slug: 'blues',
+        name: 'Blues (Chords)',
+        scaleDegrees: [0, 3, 5, 6, 7, 10],
+        majorRelations: [0, 4, 5, 5, 7, 11],
+        intervals: [0, 3, 2, 1, 1, 3, 2],
+        modeNames: ['Blues (Chords)', '2', '3', '4', '5', 'Major Blues']
+    }, {
+        slug: 'kansas-city',
+        name: 'Kansas City Blues',
+        scaleDegrees: [0, 2, 5, 7, 8], // TODO: apparently the first note actually the "5", need to support this
+        majorRelations: [0, 2, 5, 7, 9],
+        intervals: [0, 2, 3, 2, 1, 4],
+        modeNames: ['Kansas City Blues', '2', '3', '4', '5']
+    }, {
+        slug: 'whole-tone',
+        name: 'Whole Tone',
+        scaleDegrees: [0, 2, 4, 6, 8, 10],
+        majorRelations: [0, 2, 4, 5, 7, 9],
+        intervals: [0, 2, 2, 2, 2, 2, 2],
+        modeNames: ['Whole Tone', '2', '3', '4', '5', '6']
+    }, {
+        slug: 'melodic-minor',
+        name: 'Melodic Minor',
+        scaleDegrees: [0, 2, 3, 5, 7, 9, 11],
+        majorRelations: [0, 2, 4, 5, 7, 9, 11],
+        intervals: [2, 1, 2, 2, 2, 2, 1],
+        modeNames: ['Melodic Minor', 'Phrygian natural 6', 'Lydian Augmented', 'Lydian Dominant', 'Hindu', 'Locrian natural 2', 'Super Locrian']
+    }, {
+        slug: 'harmonic-major',
+        name: 'Harmonic Major',
+        scaleDegrees: [0, 2, 4, 5, 7, 8, 11],
+        majorRelations: [0, 2, 4, 5, 7, 9, 11],
+        intervals: [0, 2, 2, 1, 2, 1, 3],
+        modeNames: ['Harmonic Major', '2', '3', '4', '5', '6', '7']
+    }, {
+        slug: 'harmonic-minor',
+        name: 'Harmonic Minor',
+        scaleDegrees: [0, 2, 3, 5, 7, 8, 11],
+        majorRelations: [0, 2, 4, 5, 7, 9, 11],
+        intervals: [0, 2, 1, 2, 2, 1, 3],
+        modeNames: ['Harmonic Minor', 'Locrian natural 6', 'Harmonic Major', 'Romanian', 'Phrygian Dominant', 'Lydian sharp 2', 'Alt double flat 7']
+    }, {
+        slug: 'octatonic',
+        name: 'Octatonic',
+        scaleDegrees: [0, 1, 3, 4, 6, 7, 9, 10],
+        // majorRelations : [ 0, 2, 4, 4, 5, 7, 9,11 ],
+        majorRelations: [0, 0, 2, 4, 5, 7, 9, 11],
+        intervals: [1, 2, 1, 2, 1, 2, 1, 2],
+        modeNames: ['Octatonic', 'Diminished']
+    }, {
+        slug: 'supermode',
+        name: 'Supermode',
+        scaleDegrees: [0, 2, 3, 4, 5, 7, 8, 9, 10, 11],
+        majorRelations: [0, 2, 2, 4, 5, 7, 7, 9, 11, 11],
+        intervals: [2, 1, 1, 1, 2, 1, 1, 1, 1, 1],
+        modeNames: ['Supermode', '2', '3', '4', '5', '6', '7', '8', '9', '10']
+    }, {
+        slug: 'chromatic',
+        name: 'Chromatic',
+        scaleDegrees: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+        majorRelations: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+        intervals: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        modeNames: ['Chromatic']
+    }];
+
+    this.slugToScaleGroup = {};
+    (function () {
+        for (var i = 0; i < self.scaleGroups.length; i++) {
+            self.slugToScaleGroup[self.scaleGroups[i].slug] = self.scaleGroups[i];
+        }
+    })();
+
+    this.slugToScale = {};
+    (function () {
+        for (var i = 0; i < self.scales.length; i++) {
+            self.slugToScale[self.scales[i].slug] = self.scales[i];
+        }
+    })();
+
+    this.slugToPitchSet = {};
+    (function () {
+        for (var i = 0; i < self.scaleGroups.length; i++) {
+            var pitchSets = self.scaleGroups[i].pitchSets;
+
+            for (var j = 0; j < pitchSets.length; j++) {
+                var pitchSet = pitchSets[j];
+
+                if (pitchSet.slug in self.slugToPitchSet) {
+                    console.warn('duplicate pitchSet slug: ' + pitchSet.slug);
+                }
+                self.slugToPitchSet[pitchSet.slug] = pitchSet;
+            }
+        }
+    })();
+
+    this.init();
+};
+
+MusEDTheory.prototype = {
+    init: function init() {},
+
+    spellingOffsetInScale: function spellingOffsetInScale(scale, degree) {
+        var offset = 0;
+
+        var foundIndex = scale.scaleDegrees.findIndex(function (scaleDegree) {
+            return degree == scaleDegree;
+        });
+
+        if (foundIndex >= 0) {
+            offset = degree - scale.majorRelations[foundIndex];
+        }
+
+        return offset;
+    },
+
+    nameForNote: function nameForNote(note, rootNote, pitchSet) {
+        var degree = note % 12;
+        var root = this.tones[rootNote % 12];
+
+        degree = degree - root.degree;
+
+        return this.nameForDegree(degree, root, pitchSet);
+    },
+
+    nameForDegree: function nameForDegree(degree, root, pitchSet) {
+        while (degree < 0) {
+            degree += 12;
+        }while (degree > 24) {
+            // truncate higher intervals
+            degree -= 12;
+        }var scale = this.slugToScale[pitchSet.scaleSlug];
+        var offsetInScale = this.spellingOffsetInScale(scale, degree % 12); // NOTE: assuming this is -1, 0, or 1 !
+        var normalizedDegree = (root.degree + degree - offsetInScale + 12) % 12;
+
+        var degreeTone = this.tones[normalizedDegree];
+        var nameTone = degreeTone;
+
+        if (degreeTone.enharmonic) // TODO: make exception for pitchSet.scaleSlug == 'chromatic' ?
+            {
+                var key = this.tones[(root.degree + 12 - scale.scaleDegrees[pitchSet.mode]) % 12];
+                var relation = key.enharmonic || key.degree == 5 ? -1 : 1; // enharmonic keys will use flats by convention, natural keys except F (=5), use sharps
+
+                nameTone = this.tones[normalizedDegree - relation];
+
+                offsetInScale += relation;
+            }
+
+        var sharpOrFlat = "";
+
+        if (offsetInScale != 0) {
+
+            sharpOrFlat = '<span class="accidental ';
+            var numAccidentals = Math.abs(offsetInScale);
+
+            if (numAccidentals == 1) {
+                sharpOrFlat += offsetInScale > 0 ? 'sharp">&#9839;' : 'flat">&#9837;';
+            } else if (numAccidentals == 2) {
+                sharpOrFlat += offsetInScale > 0 ? 'doublesharp">&#119082;' : 'doubleflat">&#119083';
+            } else {
+                sharpOrFlat += '">';
+                console.warn("Unsupported number of accidentals: " + numAccidentals);
+            }
+
+            sharpOrFlat += '</span>';
+        }
+
+        var name = nameTone.name + sharpOrFlat;
+
+        return name;
+    }
+};
+
+var Theory = new MusEDTheory();
+
+module.exports = Theory;
+
+},{}],18:[function(require,module,exports){
+'use strict';
+
+var MIDI = function MIDI() {
+
+  try {
+    var midiSuccess = function midiSuccess(midiAccess) {
+      midi.inputs = midiAccess.inputs.values();
+      midi.outputs = midiAccess.outputs.values();
+
+      setupMidiIn();
+      setupMidiOut();
+    };
+
+    var midiError = function midiError(message) {
+      console.log('Error: ' + message);
+    };
+
+    var setupMidiIn = function setupMidiIn() {
+      var inputs = midi.inputs;
+      var hasAtLeastOneDevice = false;
+
+      //console.log(inputs);
+
+      // setup input
+      for (var input = inputs.next(); input && !input.done; input = inputs.next()) {
+        input.value.onmidimessage = MIDIMessageEventHandler;
+        midi.input = input.value;
+        //console.log(input.value);
+        hasAtLeastOneDevice = true;
+      }
+      if (!hasAtLeastOneDevice) {
+        midiError('No MIDI Input');
+      }
+    };
+
+    var setupMidiOut = function setupMidiOut() {
+      var outputs = midi.outputs;
+      var hasMidiOutput = false;
+      for (var output = outputs.next(); output && !output.done; output = output.next()) {
+
+        midi.output = output.value;
+        hasMidiOutput = true;
+
+        // added this to avoid throwing an error, which is probably a bug in web midi
+        if (typeof output.next === 'undefined') {
+          return;
+        }
+      }
+
+      if (!hasMidiOutput) {
+        midiError('No MIDI Output');
+      }
+    };
+
+    /**
+     *  this method is called when a midi message is received
+     */
+
+
+    var MIDIMessageEventHandler = function MIDIMessageEventHandler(event) {
+      // Mask off the lower nibble (MIDI channel, which we don't care about)
+      switch (event.data[0] & 0xf0) {
+        case 0x90:
+          if (event.data[2] != 0) {
+            // if velocity != 0, this is a note-on message
+            // midi.input.play(event.data[1]);
+            return;
+          }
+        // if velocity == 0, fall thru: it's a note-off.  MIDI's weird, y'all.
+        case 0x80:
+          // noteOff(event.data[1]);
+          return;
+      }
+    };
+
+    /**
+     *  Format MIDI data to be sent to midi output.
+     *
+     *  Examples:
+     *    MIDI.send('attack', 60, 127) --> triggers attack on middle C
+     *    MIDI.send('release', 60, 0) --> triggers release of middle C
+     *  @param  {String} message  'attack' or 'release'
+     *  @param  {Number} note     0 to 127
+     *  @param  {Number} velocity 0 to 127
+     */
+
+
+    // object to return
+    var midi = {};
+
+    midi.init = function () {
+      if ('requestMIDIAccess' in navigator) {
+        navigator.requestMIDIAccess().then(midiSuccess, midiError);
+      }
+    };
+
+    midi.send = function (message, note, velocity) {
+      var msg = [undefined, undefined, undefined];
+
+      switch (message) {
+        case 'attack':
+          msg[0] = 0x90;
+          break;
+        case 'release':
+          msg[0] = 0x80;
+          velocity = 0;
+          break;
+        case 'pitchbend':
+          msg[0] = 0xE0;
+          break;
+        default:
+          console.log('midi error, did not recognize ' + message);
+          return;
+      }
+
+      if (typeof note !== 'number' || typeof velocity !== 'number') {
+        console.log('midi error, did not recognize ' + note + ' or ' + velocity);
+        return;
+      }
+      msg[1] = note;
+
+      msg[2] = velocity;
+
+      if (midi.output) midi.output.send(msg);
+    };
+
+    /**
+     *  Send MIDI message to bend pitch
+     *  between -1.0, 0 (normal) and 1.0 semitones
+     *
+     *  @method  pitchBend
+     *  @param  {Number} amount Any decimal between -1.0 and 1.0
+     */
+    midi.pitchBend = function (amount) {
+
+      // map range util
+      function map_range(value, low1, high1, low2, high2) {
+        return low2 + (high2 - low2) * (value - low1) / (high1 - low1);
+      }
+      var val = map_range(amount, -1, 1, 0, 127);
+      midi.output.send([0xE0, 0, val]);
+    };
+
+    return midi;
+  } catch (e) {
+    throw e;
+  }
+};
+
+module.exports = new MIDI();
+
+},{}],19:[function(require,module,exports){
+'use strict';
+
+var Util = require('mused-app-core/js/Util');
+
+var MyJSONController = function MyJSONController() {
+    //this.myJSONurl          = 'https://api.myjson.com/bins/';
+    this.myJSONurl = 'https://api.musedlab.org/bins/';
+    this.CMSurl = 'https://musedlab-cms.herokuapp.com/api/sessions/';
+    //this.CMSurl            = 'http://localhost:5000/api/sessions/';
+    this.myJSONcontentType = 'application/json; charset=utf-8';
+};
+
+MyJSONController.prototype = {
+
+    createSession: function createSession(sessionData, cmsData) {
+        var self = this;
+
+        return new Promise(function (resolve, reject) {
+            $.ajax({
+                url: self.myJSONurl,
+                type: 'POST',
+                data: JSON.stringify(sessionData),
+                crossDomain: true,
+                contentType: self.myJSONcontentType,
+                dataType: 'json',
+
+                success: function success(response, textStatus, jqXHR) {
+                    var sessionSlug = response.uri.split('/').pop(); // parse  unique id of our data storage
+
+                    sessionData.options.sessionSlug = sessionSlug;
+                    sessionData.sessionURL = self.myJSONurl + sessionSlug;
+                    cmsData.dataUrl = sessionData.sessionURL;
+
+                    console.log('created session: ' + sessionSlug);
+                    self._logToCMS(sessionSlug, cmsData);
+
+                    resolve(sessionData);
+                },
+                error: function error(e) {
+                    reject(Error("couldn't create session: " + e.statusText));
+                }
+            });
+        });
+    },
+
+    _logToCMS: function _logToCMS(sessionSlug, cmsData) {
+        var self = this;
+
+        return new Promise(function (resolve, reject) {
+            $.ajax({
+                url: self.CMSurl,
+                type: 'POST',
+                data: JSON.stringify(cmsData),
+                crossDomain: true,
+                contentType: self.myJSONcontentType,
+                dataType: 'json',
+
+                success: function success(response, textStatus, jqXHR) {
+                    console.log("logged session [" + sessionSlug + '] to CMS!');
+
+                    resolve();
+                },
+                error: function error(e) {
+                    reject(Error("couldn't log session [" + sessionSlug + '] to CMS because ' + e.statusText));
+                }
+            });
+        });
+    },
+
+    updateSession: function updateSession(sessionData, successCallback) {
+        var self = this;
+        var sessionURL = this.myJSONurl + sessionData.options.sessionSlug;
+
+        return new Promise(function (resolve, reject) {
+            $.ajax({
+                url: sessionURL,
+                type: 'PUT',
+                data: JSON.stringify(sessionData),
+                contentType: self.myJSONcontentType,
+                dataType: 'json',
+
+                success: function success(response, textStatus, jqXHR) {
+                    console.log('success updating session: ' + sessionURL);
+                    successCallback();
+                },
+                error: function error(e) {
+                    reject(Error("couldn't update session [" + sessionURL + '] because ' + e.statusText));
+                }
+            });
+        });
+    },
+
+    loadSession: function loadSession(sessionSlug) {
+        var eventLog = null;
+        var sessionURL = this.myJSONurl + sessionSlug;
+
+        return new Promise(function (resolve, reject) {
+            Util.get(sessionURL).then(JSON.parse).then(function (json) {
+                console.log('got data from hash ' + sessionSlug);
+                eventLog = json;
+
+                resolve(eventLog);
+            }, function (error) {
+                reject(Error("couldn't load hash: " + sessionSlug + '] because ' + error));
+            });
+        });
+    }
+};
+
+module.exports = MyJSONController;
+
+},{"mused-app-core/js/Util":69}],20:[function(require,module,exports){
+'use strict';
+
+var MyJSONController = require('./myJsonController.js');
+
+//TODO: won't need this once hooked up to MusED.AbstractSessionManager
+var Configuration = require('mused-app-core/js/internal/ConfigManager');
+
+var Tone = require('tone');
+
+var Take = function Take(settings) {
+    this.version = 1;
+    this.created = new Date();
+    this.start = Math.round(Tone.now() * 10000) / 10000;
+    this.end = null;
+    this.events = [];
+    this.initialSettings = settings;
+};
+
+var SessionManager = function SessionManager(sourceSlug) {
+    // TODO: read from file/config?
+    var sources = {
+        dev: {
+            name: 'Development (internal use)',
+            cmsSetupID: '5617f6e3b5fdc003002148fa'
+        },
+        uat: {
+            name: 'User Acceptance Testing',
+            cmsSetupID: '563a82d2c8a3bf030014964b'
+        },
+        pub: {
+            name: 'Public (anonymous)',
+            cmsSetupID: '5615808f185d380300d5c24c'
+        },
+        pwym: {
+            name: 'Play with Your Music',
+            cmsSetupID: '561fd1ff8921780300d43068'
+        },
+        cmsd: {
+            name: 'PuzzleCards',
+            cmsSetupID: '564b99d884a1c20300c332dd'
+        },
+        yciw: {
+            name: 'Young Composers and Improvisers Workshop',
+            cmsSetupID: '564b99d884a1c20300c332dd'
+        },
+        sfly: {
+            name: 'Soundfly',
+            cmsSetupID: '56a27e9f59ae4a0300ee1eb0'
+        }
+    };
+
+    var defaultSourceSlug = 'pub';
+    var sourceSlug = sourceSlug in sources ? sourceSlug : defaultSourceSlug;
+
+    this._offline = false; // assume we're online, but client can turn off
+    this.isDirty = false;
+    this.saveInProgress = false;
+    this.takeInProgress = false;
+    this.lastKeyTime = 0;
+    this.eventLog = {};
+    this.currentTake = null;
+    this.myJSON = new MyJSONController();
+    this.cmsData = {
+        title: 'aQWERTYon session',
+        setup: sources[sourceSlug].cmsSetupID,
+        statusDate: '',
+        dataUrl: ''
+    };
+
+    this.saveInterval = 2; // check if dirty every 2 sec.
+    this.lullInterval = 3; // if user hasn't been playing for at least 3 sec, it's a lull
+
+    setInterval(this.updateSession.bind(this), this.saveInterval * 1000);
+};
+
+SessionManager.prototype = {
+    appName: 'aQWERTYon',
+    currentVersion: 6,
+
+    /*
+     Return a promise that resolves to sessionID's session, or else a new session if sessionID is empty or can't
+     be loaded.
+     */
+    loadSession: function loadSession(options) {
+        var self = this;
+        var sessionID = options.sessionSlug;
+        this.eventLog = {};
+
+        return new Promise(function (resolve, reject) {
+            if (sessionID) {
+                self.myJSON.loadSession(sessionID).then(function (eventLog) {
+                    if (eventLog.version < 3) {
+                        // version 3 introduced these:
+                        eventLog.app = self.appName;
+                        eventLog.options.features.scaleControls = true;
+                    }
+                    if (eventLog.version < 4) {
+                        // version 4 introduced these:
+                        eventLog.options.features.allControls = true;
+                        eventLog.options.features.showTakes = true;
+                        eventLog.options.features.showSounds = true;
+                    }
+                    if (eventLog.version < 5) {
+                        // version 5 introduced these:
+                        eventLog.options.features.audioEngine = 'classic';
+
+                        // And deprecated this:
+                        delete eventLog.options.embed;
+                    }
+                    if (eventLog.version < 6) {
+                        // version 6 introduced separate versioning for the options object
+                        eventLog.optionsVersion = 1;
+                    }
+
+                    eventLog.version = self.currentVersion;
+
+                    // Now, update the options object (if necessary)
+                    eventLog.options = Configuration.updateOptionsObject(eventLog.optionsVersion, eventLog.options);
+                    eventLog.optionsVersion = Configuration.version;
+
+                    self.eventLog = eventLog;
+
+                    if (options.cloneSession) {
+                        resolve(self.createSession(eventLog.options, self.eventLog));
+                    } else {
+                        ga('send', 'event', 'museid', 'load', sessionID);
+
+                        resolve(self.eventLog);
+                    }
+                }, function (error) {
+                    console.log("WARN: couldn't retrieve session [" + sessionID + '] because' + error + '; Creating new session...');
+
+                    resolve(self.createSession(options));
+                });
+            } else {
+                resolve(self.createSession(options));
+            }
+        });
+    },
+
+    resumeSession: function resumeSession(options) {
+        console.log(options);
+        this.eventLog.options = options;
+        this.currentTake = new Take({
+            audioEngine: options.features.audioEngine,
+            sound: options.soundSlug,
+            volume: options.volume,
+            scale: options.scaleSlug,
+            root: options.midiRoot
+        });
+        this.eventLog.freeplay.push(this.currentTake);
+
+        this.updateSession(true);
+    },
+
+    updateSession: function updateSession(force) {
+        if (this._offline || this.takeInProgress || !this.isDirty && !force) {
+            return; // short-circuit
+        }
+
+        var lullMillis = Tone.now() - this.lastKeyTime;
+        var isLull = lullMillis > this.lullInterval; // make sure it's X seconds since last keypress
+        if (!isLull && !force) {
+            console.log('user playing; skipping save... (' + lullMillis + ')');
+            return; // short-circuit
+        }
+
+        if (!this.saveInProgress) {
+            this.saveInProgress = true;
+            console.log('saving...');
+
+            var self = this;
+
+            if (!force && !this.takeInProgress) {
+                this.currentTake.end = Math.round(Tone.now() * 10000) / 10000; // the end, at least until more is saved
+            }
+
+            this.myJSON.updateSession(this.eventLog, function () {
+                console.log('saved!');
+                self.isDirty = false;
+                self.saveInProgress = false;
+            });
+        } else {
+            console.warn('awaiting in-progress save...');
+        }
+    },
+
+    /*
+     Return a promise that resolves to a newly created session
+     */
+    createSession: function createSession(options, eventLog) {
+        var self = this;
+
+        return new Promise(function (resolve, reject) {
+            var now = new Date();
+
+            self.cmsData.statusDate = now.toJSON();
+            self.eventLog = {
+                app: self.appName,
+                version: self.currentVersion,
+                sessionURL: '',
+                parentURL: eventLog ? eventLog.sessionURL : '',
+                options: options,
+                optionsVersion: Configuration.version,
+                takes: eventLog ? eventLog.takes : [], // array of takes
+                freeplay: []
+            };
+
+            if (self.eventLog.parentURL) {
+                self.eventLog.options.clone = false;
+            }
+
+            self.myJSON.createSession(self.eventLog, self.cmsData).then(function (eventLog) {
+                ga('send', 'event', 'museid', 'create', eventLog.options.sessionSlug);
+
+                resolve(eventLog);
+            }, function (error) {
+                reject(error);
+            });
+        });
+    },
+
+    saveOption: function saveOption(optionPath, optionValue) {
+        if (this._offline) {
+            // TODO: support even when offline?
+            return;
+        }
+
+        var optionsObject = this.eventLog.options;
+
+        for (var i = 0; i < optionPath.length - 1; ++i) {
+            optionsObject = optionsObject[optionPath[i]];
+        }
+
+        optionsObject[optionPath[i]] = optionValue;
+        this.isDirty = true;
+    },
+
+    logEvent: function logEvent(type, data) {
+        if (this._offline) {
+            // TODO: support even when offline?
+            return;
+        }
+
+        this.lastKeyTime = Tone.now();
+        this.isDirty = true;
+
+        var relativeTime = this.lastKeyTime - this.currentTake.start;
+
+        // Round relative time so that it takes up less space in JSON
+        relativeTime = Math.round(relativeTime * 10000) / 10000;
+
+        var event = {
+            type: type,
+            time: relativeTime,
+            data: data
+        };
+
+        this.currentTake.events.push(event);
+    },
+
+    startTake: function startTake() {
+        this.currentTake = new Take({});
+        this.eventLog.takes.push(this.currentTake);
+        this.takeInProgress = true;
+    },
+
+    saveTake: function saveTake() {
+        this.currentTake.end = Tone.context.currentTime;
+        this.takeInProgress = false;
+
+        this.updateSession(true);
+        //console.log("saving take:\n" + JSON.stringify(this.currentTake));
+
+        this.currentTake = new Take({});
+        this.eventLog.freeplay.push(this.currentTake);
+    }
+};
+
+Object.defineProperty(SessionManager.prototype, 'offline', {
+    get: function get() {
+        return this._offline;
+    },
+
+    set: function set(value) {
+        this._offline = value;
+    }
+});
+
+module.exports = SessionManager;
+
+},{"./myJsonController.js":19,"mused-app-core/js/internal/ConfigManager":71,"tone":65}],21:[function(require,module,exports){
+'use strict';
+
+var _slicedToArray = function () { function sliceIterator(arr, i) { var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"]) _i["return"](); } finally { if (_d) throw _e; } } return _arr; } return function (arr, i) { if (Array.isArray(arr)) { return arr; } else if (Symbol.iterator in Object(arr)) { return sliceIterator(arr, i); } else { throw new TypeError("Invalid attempt to destructure non-iterable instance"); } }; }();
+
+// Adapted from the aQWERTYon Theory build's Tonal scale/spelling and VexFlow display.
+var tonal = require('@tonaljs/tonal');
+var scales = require('./scales.json');
+var Vex = require('vexflow/releases/vexflow-debug');
+var roots = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
+var pretty = function pretty(n) {
+  return n.replace(/#/g, '♯').replace(/b/g, '♭');
+};
+function rootName(midi) {
+  return roots[(midi % 12 + 12) % 12] + (Math.floor(midi / 12) - 1);
+}
+function scaleNotes(root, slug) {
+  var s = scales[slug];return s ? s.intervals.split(' ').map(function (i) {
+    return tonal.transpose(tonal.note(rootName(root)).pc, i);
+  }) : [];
+}
+function spell(midi, root, slug) {
+  var candidates = scaleNotes(root, slug),
+      pc = (midi % 12 + 12) % 12;
+  var chosen = candidates.find(function (n) {
+    return tonal.note(n).chroma === pc;
+  }) || roots[pc];
+  for (var oct = -2; oct <= 10; oct++) {
+    if (tonal.note(chosen + oct).midi === midi) return chosen + oct;
+  }return rootName(midi);
+}
+function renderStaff(host, notes) {
+  host.innerHTML = '';var renderer = new Vex.Flow.Renderer(host, Vex.Flow.Renderer.Backends.SVG);renderer.resize(360, 260);var context = renderer.getContext();
+  var treble = new Vex.Flow.Stave(12, 30, 335).addClef('treble'),
+      bass = new Vex.Flow.Stave(12, 135, 335).addClef('bass');
+  treble.setContext(context).draw();bass.setContext(context).draw();var start = Math.max(treble.getNoteStartX(), bass.getNoteStartX());treble.setNoteStartX(start);bass.setNoteStartX(start);
+  var _arr = [['treble', treble], ['bass', bass]];
+
+  var _loop = function _loop() {
+    var _arr$_i = _slicedToArray(_arr[_i], 2),
+        clef = _arr$_i[0],
+        stave = _arr$_i[1];
+
+    var keys = notes.filter(function (n) {
+      return tonal.note(n).midi >= 60 === (clef === 'treble');
+    }).sort(function (a, b) {
+      return tonal.note(a).midi - tonal.note(b).midi;
+    }).map(function (n) {
+      return tonal.note(n).pc + '/' + tonal.note(n).oct;
+    });
+    if (!keys.length) return 'continue';
+    var chord = new Vex.Flow.StaveNote({ clef: clef, keys: keys, duration: 'w' }),
+        voice = new Vex.Flow.Voice({ num_beats: 4, beat_value: 4 }).addTickables([chord]);voice.setStave(stave);Vex.Flow.Accidental.applyAccidentals([voice], 'C');new Vex.Flow.Formatter().joinVoices([voice]).format([voice], 240);voice.setContext(context).draw();
+  };
+
+  for (var _i = 0; _i < _arr.length; _i++) {
+    var _ret = _loop();
+
+    if (_ret === 'continue') continue;
+  }
+  var svg = host.querySelector('svg');svg.setAttribute('viewBox', '0 0 360 260');svg.setAttribute('role', 'img');svg.setAttribute('aria-label', 'Live staff notation');
+}
+function renderPreview(host, midis, held, root, slug) {
+  host.innerHTML = '';var clefs = ['treble', 'bass'].filter(function (c) {
+    return midis.some(function (m) {
+      return m >= 60 === (c === 'treble');
+    });
+  }),
+      height = Math.max(110, clefs.length * 100 + 10);var renderer = new Vex.Flow.Renderer(host, Vex.Flow.Renderer.Backends.SVG);renderer.resize(440, height);var ctx = renderer.getContext();
+  var _iteratorNormalCompletion = true;
+  var _didIteratorError = false;
+  var _iteratorError = undefined;
+
+  try {
+    var _loop2 = function _loop2() {
+      var _step$value = _slicedToArray(_step.value, 2),
+          i = _step$value[0],
+          clef = _step$value[1];
+
+      var y = i * 100;
+      var stave = new Vex.Flow.Stave(8, y, 424).addClef(clef);stave.setContext(ctx).draw();
+      var group = midis.filter(function (m) {
+        return m >= 60 === (clef === 'treble');
+      });
+      if (!group.length) return 'continue';
+      var notes = group.map(function (m) {
+        var n = tonal.note(spell(m, root, slug)),
+            note = new Vex.Flow.StaveNote({ clef: clef, keys: [n.pc + '/' + n.oct], duration: 'q' });if (n.acc) note.addAccidental(0, new Vex.Flow.Accidental(n.acc));note.setStyle({ fillStyle: held.includes(m) ? '#167a70' : '#687a62', strokeStyle: held.includes(m) ? '#167a70' : '#687a62' });return note;
+      });
+      var voice = new Vex.Flow.Voice({ num_beats: group.length, beat_value: 4 }).addTickables(notes);voice.setStave(stave);new Vex.Flow.Formatter().joinVoices([voice]).format([voice], 350);voice.setContext(ctx).draw();
+    };
+
+    for (var _iterator = clefs.entries()[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+      var _ret2 = _loop2();
+
+      if (_ret2 === 'continue') continue;
+    }
+  } catch (err) {
+    _didIteratorError = true;
+    _iteratorError = err;
+  } finally {
+    try {
+      if (!_iteratorNormalCompletion && _iterator.return) {
+        _iterator.return();
+      }
+    } finally {
+      if (_didIteratorError) {
+        throw _iteratorError;
+      }
+    }
+  }
+
+  var svg = host.querySelector('svg');var bounds = svg.getBBox(),
+      top = Math.min(0, bounds.y - 12),
+      bottom = Math.max(height, bounds.y + bounds.height + 12);svg.setAttribute('viewBox', '0 ' + top + ' 440 ' + (bottom - top));svg.setAttribute('height', bottom - top);svg.setAttribute('role', 'img');svg.setAttribute('aria-label', 'Mapped keyboard octave; played notes highlighted');
+}
+module.exports = { roots: roots, rootName: rootName, pretty: pretty, spell: spell, scaleNotes: scaleNotes, renderStaff: renderStaff, renderPreview: renderPreview };
+
+},{"./scales.json":22,"@tonaljs/tonal":45,"vexflow/releases/vexflow-debug":66}],22:[function(require,module,exports){
+module.exports={
+  "harmonic-major": {
+    "name": "Harmonic Major",
+    "intervals": "1P 2M 3M 4P 5P 6m 7M",
+    "thirdIntervals": "3M 4P 5P 6m 7M 8P 9M",
+    "fifthIntervals": "5P 6m 7M 8P 9M 10M 11P",
+    "seventhIntervals": "7M 8P 9M 10M 11P 12P 13m"
+  },
+  "lydian": {
+    "name": "Lydian",
+    "intervals": "1P 2M 3M 4A 5P 6M 7M",
+    "thirdIntervals": "3M 4A 5P 6M 7M 8P 9M",
+    "fifthIntervals": "5P 6M 7M 8P 9M 10M 11A",
+    "seventhIntervals": "7M 8P 9M 10M 11A 12P 13M"
+  },
+  "lydian-dominant": {
+    "name": "Lydian Dominant",
+    "intervals": "1P 2M 3M 4A 5P 6M 7m",
+    "thirdIntervals": "3M 4A 5P 6M 7m 8P 9M",
+    "fifthIntervals": "5P 6M 7m 8P 9M 10M 11A",
+    "seventhIntervals": "7m 8P 9M 10M 11A 12P 13M"
+  },
+  "major": {
+    "name": "Major",
+    "intervals": "1P 2M 3M 4P 5P 6M 7M",
+    "thirdIntervals": "3M 4P 5P 6M 7M 8P 9M",
+    "fifthIntervals": "5P 6M 7M 8P 9M 10M 11P",
+    "seventhIntervals": "7M 8P 9M 10M 11P 12P 13M"
+  },
+  "major-blues": {
+    "name": "Major Blues",
+    "intervals": "1P 2M 3m 3M 5P 6M",
+    "thirdIntervals": "3M 4P 4A 5P 7M 8P",
+    "fifthIntervals": "5P 6M 6M 7m 9M 10M",
+    "seventhIntervals": "7m 8P 8P 8P 11P 12P"
+  },
+  "major-pentatonic": {
+    "name": "Major Pentatonic",
+    "intervals": "1P 2M 3M 5P 6M",
+    "thirdIntervals": "3M 5P 6M 8P 9M",
+    "fifthIntervals": "6M 8P 9M 10M 12P",
+    "seventhIntervals": "9M 10M 12P 13M 15P"
+  },
+  "mixolydian": {
+    "name": "Mixolydian",
+    "intervals": "1P 2M 3M 4P 5P 6M 7m",
+    "thirdIntervals": "3M 4P 5P 6M 7m 8P 9M",
+    "fifthIntervals": "5P 6M 7m 8P 9M 10M 11P",
+    "seventhIntervals": "7m 8P 9M 10M 11P 12P 13M"
+  },
+  "phrygian-dominant": {
+    "name": "Phrygian Dominant",
+    "intervals": "1P 2m 3M 4P 5P 6m 7m",
+    "thirdIntervals": "3M 4P 5P 6m 7m 8P 9m",
+    "fifthIntervals": "5P 6m 7m 8P 9m 10M 11P",
+    "seventhIntervals": "7m 8P 9m 10M 11P 12P 13m"
+  },
+  "dorian": {
+    "name": "Dorian",
+    "intervals": "1P 2M 3m 4P 5P 6M 7m",
+    "thirdIntervals": "3m 4P 5P 6M 7m 8P 9M",
+    "fifthIntervals": "5P 6M 7m 8P 9M 10m 11P",
+    "seventhIntervals": "7m 8P 9M 10m 11P 12P 13M"
+  },
+  "harmonic-minor": {
+    "name": "Harmonic Minor",
+    "intervals": "1P 2M 3m 4P 5P 6m 7M",
+    "thirdIntervals": "3m 4P 5P 6m 7M 8P 9M",
+    "fifthIntervals": "5P 6m 7M 8P 9M 10m 11P",
+    "seventhIntervals": "7M 8P 9M 10m 11P 12P 13m"
+  },
+  "locrian": {
+    "name": "Locrian",
+    "intervals": "1P 2m 3m 4P 5d 6m 7m",
+    "thirdIntervals": "3m 4P 5d 6m 7m 8P 9m",
+    "fifthIntervals": "5d 6m 7m 8P 9m 10m 11P",
+    "seventhIntervals": "7m 8P 9m 10m 11P 12d 13m"
+  },
+  "melodic-minor": {
+    "name": "Melodic Minor",
+    "intervals": "1P 2M 3m 4P 5P 6M 7M",
+    "thirdIntervals": "3m 4P 5P 6M 7M 8P 9M",
+    "fifthIntervals": "5P 6M 7M 8P 9M 10m 11P",
+    "seventhIntervals": "7M 8P 9M 10m 11P 12P 13M"
+  },
+  "minor-pentatonic": {
+    "name": "Minor Pentatonic",
+    "intervals": "1P 3m 4P 5P 7m",
+    "thirdIntervals": "4P 5P 7m 8P 10m",
+    "fifthIntervals": "7m 8P 10m 11P 12P",
+    "seventhIntervals": "10m 11P 12P 14m 15P"
+  },
+  "natural-minor": {
+    "name": "Natural Minor",
+    "intervals": "1P 2M 3m 4P 5P 6m 7m",
+    "thirdIntervals": "3m 4P 5P 6m 7m 8P 9M",
+    "fifthIntervals": "5P 6m 7m 8P 9M 10m 11P",
+    "seventhIntervals": "7m 8P 9M 10m 11P 12P 13m"
+  },
+  "phrygian": {
+    "name": "Phrygian",
+    "intervals": "1P 2m 3m 4P 5P 6m 7m",
+    "thirdIntervals": "3m 4P 5P 6m 7m 8P 9m",
+    "fifthIntervals": "5P 6m 7m 8P 9m 10m 11P",
+    "seventhIntervals": "7m 8P 9m 10m 11P 12P 13m"
+  },
+  "altered": {
+    "name": "Altered",
+    "intervals": "1P 2m 3m 3M 5d 6m 7m",
+    "thirdIntervals": "3m 3M 5d 6m 7m 8P 9m",
+    "fifthIntervals": "5d 6m 7m 8P 9m 10m 10M",
+    "seventhIntervals": "7m 8P 9m 10m 10M 12d 13m"
+  },
+  "blues": {
+    "name": "Blues (Chords)",
+    "intervals": "1P 3m 4P 4A 5P 7m",
+    "thirdIntervals": "3M 5P 6M 6M 7M 9M",
+    "fifthIntervals": "5P 7m 8P 8P 9M 11P",
+    "seventhIntervals": "7m 8A 10m 10m 11P 12A"
+  },
+  "blues-octaves": {
+    "name": "Blues (Scale)",
+    "intervals": "1P 3m 4P 4A 5P 7m",
+    "thirdIntervals": "8P 10m 11P 11A 12P 14m",
+    "fifthIntervals": "15P 17m 18P 18A 19P 21m",
+    "seventhIntervals": "22P 24m 25P 25A 26P 28m"
+  },
+  "kansas-city": {
+    "name": "Kansas City Blues",
+    "intervals": "1P 2M 3m 5P 6M",
+    "thirdIntervals": "3M 4A 5P 7M 8A",
+    "fifthIntervals": "5P 6M 6M 9M 10M",
+    "seventhIntervals": "6A 8P 9A 10A 12P"
+  },
+  "mixolydian-b6": {
+    "name": "Mixolydian b6",
+    "intervals": "1P 2M 3M 4P 5P 6m 7m",
+    "thirdIntervals": "3M 4P 5P 6m 7m 8P 9M",
+    "fifthIntervals": "5P 6m 7m 8P 9M 10M 11P",
+    "seventhIntervals": "7m 8P 9M 10M 11P 12P 13m"
+  },
+  "heptatonic-blues": {
+    "name": "Heptatonic Blues",
+    "intervals": "1P 2M 3m 4P 5d 5P 7m",
+    "thirdIntervals": "3m 4P 5d 5P 7m 8P 9M",
+    "fifthIntervals": "5d 5P 7m 8P 9M 10m 11P",
+    "seventhIntervals": "7m 8P 9M 10m 11P 12d 12P"
+  },
+  "chromatic": {
+    "name": "Chromatic",
+    "intervals": "1P 2m 2M 3m 3M 4P 5d 5P 6m 6M 7m 7M",
+    "thirdIntervals": "3M 4P 5d 5P 6m 6M 7m 7M 8P 9m 9M 10m",
+    "fifthIntervals": "5P 6m 6M 7m 7M 8P 9m 9M 10m 10M 11P 12d",
+    "seventhIntervals": "7m 7M 8P 9m 9M 10m 10M 11P 12d 12P 13m 13M"
+  },
+  "diminished": {
+    "name": "Diminished",
+    "intervals": "1P 2m 3m 3M 4A 5P 6M 7m",
+    "thirdIntervals": "3m 3M 4A 5P 6M 7m 8P 9m",
+    "fifthIntervals": "4A 5P 6M 7m 8P 9m 10m 10M",
+    "seventhIntervals": "6M 7m 8P 9m 10m 10M 11A 12P"
+  },
+  "octatonic": {
+    "name": "Octatonic",
+    "intervals": "1P 2M 3m 4P 5d 5A 6M 7M",
+    "thirdIntervals": "3m 4P 5d 5A 6M 7M 8P 9M",
+    "fifthIntervals": "5d 5A 6M 7M 8P 9M 10m 11P",
+    "seventhIntervals": "6M 7M 8P 9M 10m 11P 12d 12A"
+  },
+  "whole-tone": {
+    "name": "Whole Tone",
+    "intervals": "1P 2M 3M 4A 5A 6A",
+    "thirdIntervals": "3M 4A 5A 6A 8P 9M",
+    "fifthIntervals": "5A 6A 8P 9M 10M 11A",
+    "seventhIntervals": "6A 8P 9M 10M 11A 12A"
+  }
+}
+
+},{}],23:[function(require,module,exports){
+'use strict';
+
+/**
+ * Object for doing event sequencing.
+ */
+var Timing = function Timing() {
+    /**
+     * Callback function for every animation frame in the timing library
+     */
+    this.onProgress = function () {};
+
+    // Event list: structured identically to our score JSON files
+    this._eventList = new Array();
+
+    // Flattened event list: for lookup by index
+    this._allEvents = new Array();
+
+    // Array of events that are currently active
+    this._currEvents = {};
+
+    // The numeric id that will be attached to the next event. Doubles as a total
+    // count of all events currently in the event list (irrespective of hierarchy)
+    this._currentId = 0;
+
+    // All registered callback functions. Keys are event types, values are objects
+    // of the form {'onStart': myFunction, etc.}
+    this._callbacks = {};
+
+    // The media object that will be synchronized with the playback.
+    this._mediaSync;
+
+    //
+    this._startTime = 0;
+    this._currentTime = 0;
+    this._duration = 0.0;
+
+    // Whether the timing system is currently playing.
+    this._isPlaying = false;
+
+    // Keeps track of which top-level event is next in the list when playing.
+    // The idea here is a slight performance improvement, but there may be better
+    // ways to do this.
+    this._nextEventIndex = 0;
+};
+
+Timing.prototype = {
+    /**
+     * Load events into the timing library event list from a JSON file.
+     * @param  {String}   url      Path to the JSON file that you're trying to load.
+     * @param  {Function} callback Callback function for when the events are loaded. The event list is passed as a parameter to the callback.
+     */
+    loadEvents: function loadEvents(url, callback) {
+        var xmlhttp = new XMLHttpRequest();
+
+        // Wait for progress on the request
+        xmlhttp.onreadystatechange = function (evt) {
+            // Check if the request has gone through
+            if (evt.target.readyState == 4 && evt.target.status == 200) {
+                // Parse the JSON
+                var eventList = JSON.parse(evt.target.responseText);
+
+                this.addEvents(eventList);
+
+                // Fire callback
+                if (callback) {
+                    callback(eventList);
+                }
+            }
+        }.bind(this);
+
+        xmlhttp.open("GET", url, true);
+        xmlhttp.send();
+    },
+
+    /**
+     * Play the timeline from the beginning, or from the point where the timeline
+     * was last paused.
+     */
+    play: function play() {
+        if (this._mediaSync) {
+            this._mediaSync.play();
+        } else {
+            this._startTime = null;
+        }
+
+        this._isPlaying = true;
+        this._nextEventIndex = 0;
+
+        // Start up the requestAnimationFrame loop
+        this._updateTiming();
+    },
+
+    /**
+     * Pause the main timeline.
+     */
+    pause: function pause() {
+        if (!this._isPlaying) {
+            return; // already paused
+        }
+
+        this._isPlaying = false;
+
+        if (this._mediaSync) {
+            this._mediaSync.pause();
+        }
+
+        // Fire ending events for all
+        for (var index in this._currEvents) {
+            this._endEvent(this._currEvents[index]);
+        }
+
+        // Clear our our current events list
+        this._currEvents = [];
+    },
+
+    /**
+     * [function description]
+     * @param  {String} type         The name of the type of event to attach these callbacks to.
+     * @param  {Function} onStart    Callback function for event start. Receives the event object as a parameter.
+     * @param  {Function} onEnd      Callback function for event end. Receives the event object as a parameter.
+     * @param  {Function} onProgress Callback function for each animation frame during an event. Receives the event object,
+     *                               and a progress percentage (from 0 to 1) as parameters.
+     */
+    setEventCallback: function setEventCallback(type, onStart, onEnd, onProgress) {
+        // Attach an empty object to the callbacks of this type.
+        this._callbacks[type] = {};
+
+        if (onStart) {
+            this._callbacks[type]['onStart'] = onStart;
+        }
+
+        if (onEnd) {
+            this._callbacks[type]['onEnd'] = onEnd;
+        }
+
+        if (onProgress) {
+            this._callbacks[type]['onProgress'] = onProgress;
+        }
+    },
+
+    /**
+     * Specify a media object whose playback will be synchronized to the timeline.
+     * @param  {Object} mediaObject Reference to either an audio or video tag that syncs with
+     *                              the timeline.
+     */
+    attachMedia: function attachMedia(mediaObject) {
+        this._mediaSync = mediaObject;
+    },
+
+    setMediaSource: function setMediaSource(src) {
+        if (this._mediaSync) {
+            this._mediaSync.src = src;
+        }
+        // TODO: add this callback so client can use metadata if desired
+        //this._mediaSync.addEventListener('loadedmetadata', function () {
+        //});
+    },
+
+    getMediaSource: function getMediaSource() {
+        return this._mediaSync ? this._mediaSync.src : '';
+    },
+
+    /**
+     * Get a reference to the event with the specified ID number.
+     * @param  {Number} id The ID number of the requested event.
+     * @return {Object}    The relevant event object.
+     */
+    getEventById: function getEventById(id) {
+        return this._allEvents[id];
+    },
+
+    /**
+     * Called every animation frame to check in on the state of the events.
+     * @private
+     */
+    _updateTiming: function _updateTiming(now) {
+        if (!this._mediaSync && now) {
+            if (!this._startTime) {
+                this._startTime = now / 1000;
+            } else {
+                this._currentTime = now / 1000 - this._startTime;
+            }
+        }
+        // TODO: Really, we should be registering event callbacks to check this sort
+        // of thing. For now, this is okay.
+        if (this._mediaSync && this._mediaSync.paused) {
+            this.pause();
+        } else if (this.currentTime > this.duration) {
+            this.pause();
+        } else {
+            this.onProgress();
+
+            // Iterate through all of the current events
+            for (var index in this._currEvents) {
+                var event = this._currEvents[index];
+
+                if (this.currentTime > event['end']) {
+                    // End any events whose time has passed
+                    this._endEvent(event);
+                } else {
+                    // Call the event progress callback
+                    this._progressEvent(event);
+
+                    for (var subIndex in event['events']) {
+                        var subEvent = event['events'][subIndex];
+
+                        if (subEvent['start'] <= this.currentTime && subEvent['end'] > this.currentTime) {
+                            this._startEvent(subEvent);
+                        } else {
+                            //console.log('skipping subEvent ' + subIndex + ': ' + subEvent['start'] + ' - ' + subEvent['end']);
+                        }
+                    }
+                }
+            }
+
+            // Now, look through all of the events and figure out which new events need to be fired
+            for (var index = this._nextEventIndex; index < this._eventList.length; ++index) {
+                var event = this._eventList[index];
+                // Check if the event we're looking at falls within the current time.
+                if (event['start'] <= this.currentTime && event['end'] > this.currentTime) {
+                    // If so, start the event (which will recursively start any appropriate sub-events)
+                    this._startEvent(event);
+
+                    this._nextEventIndex += 1;
+                }
+            }
+
+            window.requestAnimationFrame(this._updateTiming.bind(this));
+        }
+    },
+
+    addEvents: function addEvents(eventList) {
+        for (var i = 0; i < eventList.length; i++) {
+            var event = eventList[i];
+
+            this._eventList.push(event);
+            this._setEventId(event);
+        }
+    },
+
+    clearEvents: function clearEvents() {
+        this.pause();
+
+        this._eventList.length = 0;
+    },
+
+    _setEventId: function _setEventId(event) {
+        event['id'] = this._currentId;
+        this._currentId += 1;
+
+        this._allEvents.push(event);
+
+        for (var index in event['events']) {
+            this._setEventId(event['events'][index]);
+        }
+    },
+
+    _startEvent: function _startEvent(event) {
+        if (this._callbacks[event['type']] && this._callbacks[event['type']].onStart) {
+            this._callbacks[event['type']].onStart(event);
+        }
+
+        this._currEvents[event['id']] = event;
+    },
+
+    _endEvent: function _endEvent(event) {
+        if (this._callbacks[event['type']] && this._callbacks[event['type']].onEnd) {
+            this._callbacks[event['type']].onEnd(event);
+        }
+
+        delete this._currEvents[event['id']];
+    },
+
+    _progressEvent: function _progressEvent(event) {
+        if (this._callbacks[event['type']] && this._callbacks[event['type']].onProgress) {
+            var progress = (this.currentTime - event['start']) / (event['end'] - event['start']);
+
+            this.callbacks[event['type']].onProgress(event, progress);
+        }
+    }
+};
+
+Object.defineProperty(Timing.prototype, 'currentTime', {
+    get: function get() {
+        return this._mediaSync ? this._mediaSync.currentTime : this._currentTime;
+    },
+    set: function set(value) {
+        if (this._mediaSync) {
+            this._mediaSync.currentTime = value;
+        } else {
+            this._currentTime = value;
+        }
+    }
+});
+
+Object.defineProperty(Timing.prototype, 'duration', {
+    get: function get() {
+        return this._mediaSync ? this._mediaSync.duration : this._duration;
+    },
+    set: function set(value) {
+        if (this._mediaSync) {
+            this._mediaSync.duration = value; // TODO: is this legit?
+        } else {
+            this._duration = value;
+        };
+    }
+});
+
+Object.defineProperty(Timing.prototype, 'paused', {
+    get: function get() {
+        return this._mediaSync ? this._mediaSync.paused : !this._isPlaying;
+    }
+});
+
+module.exports = Timing;
+
+},{}],24:[function(require,module,exports){
+"use strict";
+
+var Util = {
+    debounce: function debounce(func, wait, immediate) {
+        var timeout;
+        return function () {
+            var context = this,
+                args = arguments;
+            var later = function later() {
+                timeout = null;
+                if (!immediate) func.apply(context, args);
+            };
+            var callNow = immediate && !timeout;
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+            if (callNow) func.apply(context, args);
+        };
+    }
+};
+
+module.exports = Util;
+
+},{}],25:[function(require,module,exports){
 (function (global, factory) {
   typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('@tonaljs/core')) :
   typeof define === 'function' && define.amd ? define(['exports', '@tonaljs/core'], factory) :
@@ -83,7 +4840,7 @@
 })));
 
 
-},{"@tonaljs/core":7}],2:[function(require,module,exports){
+},{"@tonaljs/core":31}],26:[function(require,module,exports){
 (function (global, factory) {
   typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('@tonaljs/core')) :
   typeof define === 'function' && define.amd ? define(['exports', '@tonaljs/core'], factory) :
@@ -245,7 +5002,7 @@
 })));
 
 
-},{"@tonaljs/core":7}],3:[function(require,module,exports){
+},{"@tonaljs/core":31}],27:[function(require,module,exports){
 (function (global, factory) {
   typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('@tonaljs/chord-type'), require('@tonaljs/core'), require('@tonaljs/pcset')) :
   typeof define === 'function' && define.amd ? define(['exports', '@tonaljs/chord-type', '@tonaljs/core', '@tonaljs/pcset'], factory) :
@@ -310,7 +5067,7 @@
 })));
 
 
-},{"@tonaljs/chord-type":4,"@tonaljs/core":7,"@tonaljs/pcset":14}],4:[function(require,module,exports){
+},{"@tonaljs/chord-type":28,"@tonaljs/core":31,"@tonaljs/pcset":38}],28:[function(require,module,exports){
 (function (global, factory) {
     typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('@tonaljs/core'), require('@tonaljs/pcset')) :
     typeof define === 'function' && define.amd ? define(['exports', '@tonaljs/core', '@tonaljs/pcset'], factory) :
@@ -599,7 +5356,7 @@
 })));
 
 
-},{"@tonaljs/core":7,"@tonaljs/pcset":14}],5:[function(require,module,exports){
+},{"@tonaljs/core":31,"@tonaljs/pcset":38}],29:[function(require,module,exports){
 (function (global, factory) {
     typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('@tonaljs/chord-detect'), require('@tonaljs/chord-type'), require('@tonaljs/core'), require('@tonaljs/pcset'), require('@tonaljs/scale-type')) :
     typeof define === 'function' && define.amd ? define(['exports', '@tonaljs/chord-detect', '@tonaljs/chord-type', '@tonaljs/core', '@tonaljs/pcset', '@tonaljs/scale-type'], factory) :
@@ -836,7 +5593,7 @@
 })));
 
 
-},{"@tonaljs/chord-detect":3,"@tonaljs/chord-type":4,"@tonaljs/core":7,"@tonaljs/pcset":14,"@tonaljs/scale-type":18}],6:[function(require,module,exports){
+},{"@tonaljs/chord-detect":27,"@tonaljs/chord-type":28,"@tonaljs/core":31,"@tonaljs/pcset":38,"@tonaljs/scale-type":42}],30:[function(require,module,exports){
 (function (global, factory) {
   typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
   typeof define === 'function' && define.amd ? define(['exports'], factory) :
@@ -972,7 +5729,7 @@
 })));
 
 
-},{}],7:[function(require,module,exports){
+},{}],31:[function(require,module,exports){
 (function (global, factory) {
   typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
   typeof define === 'function' && define.amd ? define(['exports'], factory) :
@@ -1346,7 +6103,7 @@
 })));
 
 
-},{}],8:[function(require,module,exports){
+},{}],32:[function(require,module,exports){
 (function (global, factory) {
     typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
     typeof define === 'function' && define.amd ? define(['exports'], factory) :
@@ -1477,7 +6234,7 @@
 })));
 
 
-},{}],9:[function(require,module,exports){
+},{}],33:[function(require,module,exports){
 (function (global, factory) {
   typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('@tonaljs/core')) :
   typeof define === 'function' && define.amd ? define(['exports', '@tonaljs/core'], factory) :
@@ -1676,7 +6433,7 @@
 })));
 
 
-},{"@tonaljs/core":7}],10:[function(require,module,exports){
+},{"@tonaljs/core":31}],34:[function(require,module,exports){
 (function (global, factory) {
     typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('@tonaljs/core'), require('@tonaljs/note'), require('@tonaljs/roman-numeral')) :
     typeof define === 'function' && define.amd ? define(['exports', '@tonaljs/core', '@tonaljs/note', '@tonaljs/roman-numeral'], factory) :
@@ -1795,7 +6552,7 @@
 })));
 
 
-},{"@tonaljs/core":7,"@tonaljs/note":13,"@tonaljs/roman-numeral":17}],11:[function(require,module,exports){
+},{"@tonaljs/core":31,"@tonaljs/note":37,"@tonaljs/roman-numeral":41}],35:[function(require,module,exports){
 (function (global, factory) {
   typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('@tonaljs/core')) :
   typeof define === 'function' && define.amd ? define(['exports', '@tonaljs/core'], factory) :
@@ -1905,7 +6662,7 @@
 })));
 
 
-},{"@tonaljs/core":7}],12:[function(require,module,exports){
+},{"@tonaljs/core":31}],36:[function(require,module,exports){
 (function (global, factory) {
     typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('@tonaljs/core'), require('@tonaljs/pcset')) :
     typeof define === 'function' && define.amd ? define(['exports', '@tonaljs/core', '@tonaljs/pcset'], factory) :
@@ -2037,7 +6794,7 @@
 })));
 
 
-},{"@tonaljs/core":7,"@tonaljs/pcset":14}],13:[function(require,module,exports){
+},{"@tonaljs/core":31,"@tonaljs/pcset":38}],37:[function(require,module,exports){
 (function (global, factory) {
   typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('@tonaljs/core'), require('@tonaljs/midi')) :
   typeof define === 'function' && define.amd ? define(['exports', '@tonaljs/core', '@tonaljs/midi'], factory) :
@@ -2310,7 +7067,7 @@
 })));
 
 
-},{"@tonaljs/core":7,"@tonaljs/midi":11}],14:[function(require,module,exports){
+},{"@tonaljs/core":31,"@tonaljs/midi":35}],38:[function(require,module,exports){
 (function (global, factory) {
   typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('@tonaljs/collection'), require('@tonaljs/core')) :
   typeof define === 'function' && define.amd ? define(['exports', '@tonaljs/collection', '@tonaljs/core'], factory) :
@@ -2614,7 +7371,7 @@
 })));
 
 
-},{"@tonaljs/collection":6,"@tonaljs/core":7}],15:[function(require,module,exports){
+},{"@tonaljs/collection":30,"@tonaljs/core":31}],39:[function(require,module,exports){
 (function (global, factory) {
   typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('@tonaljs/chord'), require('@tonaljs/core'), require('@tonaljs/roman-numeral')) :
   typeof define === 'function' && define.amd ? define(['exports', '@tonaljs/chord', '@tonaljs/core', '@tonaljs/roman-numeral'], factory) :
@@ -2658,7 +7415,7 @@
 })));
 
 
-},{"@tonaljs/chord":5,"@tonaljs/core":7,"@tonaljs/roman-numeral":17}],16:[function(require,module,exports){
+},{"@tonaljs/chord":29,"@tonaljs/core":31,"@tonaljs/roman-numeral":41}],40:[function(require,module,exports){
 (function (global, factory) {
   typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('@tonaljs/collection'), require('@tonaljs/midi')) :
   typeof define === 'function' && define.amd ? define(['exports', '@tonaljs/collection', '@tonaljs/midi'], factory) :
@@ -2717,7 +7474,7 @@
 })));
 
 
-},{"@tonaljs/collection":6,"@tonaljs/midi":11}],17:[function(require,module,exports){
+},{"@tonaljs/collection":30,"@tonaljs/midi":35}],41:[function(require,module,exports){
 (function (global, factory) {
   typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('@tonaljs/core')) :
   typeof define === 'function' && define.amd ? define(['exports', '@tonaljs/core'], factory) :
@@ -2816,7 +7573,7 @@
 })));
 
 
-},{"@tonaljs/core":7}],18:[function(require,module,exports){
+},{"@tonaljs/core":31}],42:[function(require,module,exports){
 (function (global, factory) {
     typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('@tonaljs/core'), require('@tonaljs/pcset')) :
     typeof define === 'function' && define.amd ? define(['exports', '@tonaljs/core', '@tonaljs/pcset'], factory) :
@@ -3076,7 +7833,7 @@
 })));
 
 
-},{"@tonaljs/core":7,"@tonaljs/pcset":14}],19:[function(require,module,exports){
+},{"@tonaljs/core":31,"@tonaljs/pcset":38}],43:[function(require,module,exports){
 (function (global, factory) {
     typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('@tonaljs/chord-type'), require('@tonaljs/collection'), require('@tonaljs/core'), require('@tonaljs/note'), require('@tonaljs/pcset'), require('@tonaljs/scale-type')) :
     typeof define === 'function' && define.amd ? define(['exports', '@tonaljs/chord-type', '@tonaljs/collection', '@tonaljs/core', '@tonaljs/note', '@tonaljs/pcset', '@tonaljs/scale-type'], factory) :
@@ -3326,7 +8083,7 @@
 })));
 
 
-},{"@tonaljs/chord-type":4,"@tonaljs/collection":6,"@tonaljs/core":7,"@tonaljs/note":13,"@tonaljs/pcset":14,"@tonaljs/scale-type":18}],20:[function(require,module,exports){
+},{"@tonaljs/chord-type":28,"@tonaljs/collection":30,"@tonaljs/core":31,"@tonaljs/note":37,"@tonaljs/pcset":38,"@tonaljs/scale-type":42}],44:[function(require,module,exports){
 (function (global, factory) {
   typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
   typeof define === 'function' && define.amd ? define(['exports'], factory) :
@@ -3407,7 +8164,7 @@
 })));
 
 
-},{}],21:[function(require,module,exports){
+},{}],45:[function(require,module,exports){
 (function (global, factory) {
   typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('@tonaljs/abc-notation'), require('@tonaljs/array'), require('@tonaljs/chord'), require('@tonaljs/chord-type'), require('@tonaljs/collection'), require('@tonaljs/core'), require('@tonaljs/duration-value'), require('@tonaljs/interval'), require('@tonaljs/key'), require('@tonaljs/midi'), require('@tonaljs/mode'), require('@tonaljs/note'), require('@tonaljs/pcset'), require('@tonaljs/progression'), require('@tonaljs/range'), require('@tonaljs/roman-numeral'), require('@tonaljs/scale'), require('@tonaljs/scale-type'), require('@tonaljs/time-signature')) :
   typeof define === 'function' && define.amd ? define(['exports', '@tonaljs/abc-notation', '@tonaljs/array', '@tonaljs/chord', '@tonaljs/chord-type', '@tonaljs/collection', '@tonaljs/core', '@tonaljs/duration-value', '@tonaljs/interval', '@tonaljs/key', '@tonaljs/midi', '@tonaljs/mode', '@tonaljs/note', '@tonaljs/pcset', '@tonaljs/progression', '@tonaljs/range', '@tonaljs/roman-numeral', '@tonaljs/scale', '@tonaljs/scale-type', '@tonaljs/time-signature'], factory) :
@@ -3475,7 +8232,7 @@
 })));
 
 
-},{"@tonaljs/abc-notation":1,"@tonaljs/array":2,"@tonaljs/chord":5,"@tonaljs/chord-type":4,"@tonaljs/collection":6,"@tonaljs/core":7,"@tonaljs/duration-value":8,"@tonaljs/interval":9,"@tonaljs/key":10,"@tonaljs/midi":11,"@tonaljs/mode":12,"@tonaljs/note":13,"@tonaljs/pcset":14,"@tonaljs/progression":15,"@tonaljs/range":16,"@tonaljs/roman-numeral":17,"@tonaljs/scale":19,"@tonaljs/scale-type":18,"@tonaljs/time-signature":20}],22:[function(require,module,exports){
+},{"@tonaljs/abc-notation":25,"@tonaljs/array":26,"@tonaljs/chord":29,"@tonaljs/chord-type":28,"@tonaljs/collection":30,"@tonaljs/core":31,"@tonaljs/duration-value":32,"@tonaljs/interval":33,"@tonaljs/key":34,"@tonaljs/midi":35,"@tonaljs/mode":36,"@tonaljs/note":37,"@tonaljs/pcset":38,"@tonaljs/progression":39,"@tonaljs/range":40,"@tonaljs/roman-numeral":41,"@tonaljs/scale":43,"@tonaljs/scale-type":42,"@tonaljs/time-signature":44}],46:[function(require,module,exports){
 module.exports = ADSR
 
 function ADSR(audioContext){
@@ -3637,7 +8394,7 @@ function getValue(start, end, fromTime, toTime, at){
   return value
 }
 
-},{}],23:[function(require,module,exports){
+},{}],47:[function(require,module,exports){
 'use strict'
 
 // DECODE UTILITIES
@@ -3675,7 +8432,7 @@ function decode (sBase64, nBlocksSize) {
 
 module.exports = { decode: decode }
 
-},{}],24:[function(require,module,exports){
+},{}],48:[function(require,module,exports){
 /* global XMLHttpRequest */
 'use strict'
 
@@ -3701,7 +8458,7 @@ module.exports = function (url, type) {
   })
 }
 
-},{}],25:[function(require,module,exports){
+},{}],49:[function(require,module,exports){
 'use strict'
 
 var base64 = require('./base64')
@@ -3850,7 +8607,7 @@ function midiJsToJson (data) {
 if (typeof module === 'object' && module.exports) module.exports = load
 if (typeof window !== 'undefined') window.loadAudio = load
 
-},{"./base64":23,"./fetch":24}],26:[function(require,module,exports){
+},{"./base64":47,"./fetch":48}],50:[function(require,module,exports){
 'use strict'
 
 exports.byteLength = byteLength
@@ -4002,7 +8759,7 @@ function fromByteArray (uint8) {
   return parts.join('')
 }
 
-},{}],27:[function(require,module,exports){
+},{}],51:[function(require,module,exports){
 (function (Buffer){(function (){
 /*!
  * The buffer module from node.js, for the browser.
@@ -5783,7 +10540,7 @@ function numberIsNaN (obj) {
 }
 
 }).call(this)}).call(this,require("buffer").Buffer)
-},{"base64-js":26,"buffer":27,"ieee754":28}],28:[function(require,module,exports){
+},{"base64-js":50,"buffer":51,"ieee754":52}],52:[function(require,module,exports){
 /*! ieee754. BSD-3-Clause License. Feross Aboukhadijeh <https://feross.org/opensource> */
 exports.read = function (buffer, offset, isLE, mLen, nBytes) {
   var e, m
@@ -5870,16 +10627,16 @@ exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
   buffer[offset + i - d] |= s * 128
 }
 
-},{}],29:[function(require,module,exports){
+},{}],53:[function(require,module,exports){
 (function (global){(function (){
 (function(e){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=e()}else if(typeof define==="function"&&define.amd){define([],e)}else{var t;if(typeof window!=="undefined"){t=window}else if(typeof global!=="undefined"){t=global}else if(typeof self!=="undefined"){t=self}else{t=this}t.midimessage=e()}})(function(){var e,t,s;return function o(e,t,s){function a(n,i){if(!t[n]){if(!e[n]){var l=typeof require=="function"&&require;if(!i&&l)return l(n,!0);if(r)return r(n,!0);var h=new Error("Cannot find module '"+n+"'");throw h.code="MODULE_NOT_FOUND",h}var c=t[n]={exports:{}};e[n][0].call(c.exports,function(t){var s=e[n][1][t];return a(s?s:t)},c,c.exports,o,e,t,s)}return t[n].exports}var r=typeof require=="function"&&require;for(var n=0;n<s.length;n++)a(s[n]);return a}({1:[function(e,t,s){"use strict";Object.defineProperty(s,"__esModule",{value:true});s["default"]=function(e){function t(e){this._event=e;this._data=e.data;this.receivedTime=e.receivedTime;if(this._data&&this._data.length<2){console.warn("Illegal MIDI message of length",this._data.length);return}this._messageCode=e.data[0]&240;this.channel=e.data[0]&15;switch(this._messageCode){case 128:this.messageType="noteoff";this.key=e.data[1]&127;this.velocity=e.data[2]&127;break;case 144:this.messageType="noteon";this.key=e.data[1]&127;this.velocity=e.data[2]&127;break;case 160:this.messageType="keypressure";this.key=e.data[1]&127;this.pressure=e.data[2]&127;break;case 176:this.messageType="controlchange";this.controllerNumber=e.data[1]&127;this.controllerValue=e.data[2]&127;if(this.controllerNumber===120&&this.controllerValue===0){this.channelModeMessage="allsoundoff"}else if(this.controllerNumber===121){this.channelModeMessage="resetallcontrollers"}else if(this.controllerNumber===122){if(this.controllerValue===0){this.channelModeMessage="localcontroloff"}else{this.channelModeMessage="localcontrolon"}}else if(this.controllerNumber===123&&this.controllerValue===0){this.channelModeMessage="allnotesoff"}else if(this.controllerNumber===124&&this.controllerValue===0){this.channelModeMessage="omnimodeoff"}else if(this.controllerNumber===125&&this.controllerValue===0){this.channelModeMessage="omnimodeon"}else if(this.controllerNumber===126){this.channelModeMessage="monomodeon"}else if(this.controllerNumber===127){this.channelModeMessage="polymodeon"}break;case 192:this.messageType="programchange";this.program=e.data[1];break;case 208:this.messageType="channelpressure";this.pressure=e.data[1]&127;break;case 224:this.messageType="pitchbendchange";var t=e.data[2]&127;var s=e.data[1]&127;this.pitchBend=(t<<8)+s;break}}return new t(e)};t.exports=s["default"]},{}]},{},[1])(1)});
 
 }).call(this)}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],30:[function(require,module,exports){
+},{}],54:[function(require,module,exports){
 !function(t,n){"object"==typeof exports&&"undefined"!=typeof module?n(exports):"function"==typeof define&&define.amd?define(["exports"],n):n(t.NoteParser=t.NoteParser||{})}(this,function(t){"use strict";function n(t,n){return Array(n+1).join(t)}function r(t){return"number"==typeof t}function e(t){return"string"==typeof t}function u(t){return void 0!==t}function c(t,n){return Math.pow(2,(t-69)/12)*(n||440)}function o(){return b}function i(t,n,r){if("string"!=typeof t)return null;var e=b.exec(t);if(!e||!n&&e[4])return null;var u={letter:e[1].toUpperCase(),acc:e[2].replace(/x/g,"##")};u.pc=u.letter+u.acc,u.step=(u.letter.charCodeAt(0)+3)%7,u.alt="b"===u.acc[0]?-u.acc.length:u.acc.length;var o=A[u.step]+u.alt;return u.chroma=o<0?12+o:o%12,e[3]&&(u.oct=+e[3],u.midi=o+12*(u.oct+1),u.freq=c(u.midi,r)),n&&(u.tonicOf=e[4]),u}function f(t){return r(t)?t<0?n("b",-t):n("#",t):""}function a(t){return r(t)?""+t:""}function l(t,n,r){return null===t||void 0===t?null:t.step?l(t.step,t.alt,t.oct):t<0||t>6?null:C.charAt(t)+f(n)+a(r)}function p(t){if((r(t)||e(t))&&t>=0&&t<128)return+t;var n=i(t);return n&&u(n.midi)?n.midi:null}function s(t,n){var r=p(t);return null===r?null:c(r,n)}function d(t){return(i(t)||{}).letter}function m(t){return(i(t)||{}).acc}function h(t){return(i(t)||{}).pc}function v(t){return(i(t)||{}).step}function g(t){return(i(t)||{}).alt}function x(t){return(i(t)||{}).chroma}function y(t){return(i(t)||{}).oct}var b=/^([a-gA-G])(#{1,}|b{1,}|x{1,}|)(-?\d*)\s*(.*)\s*$/,A=[0,2,4,5,7,9,11],C="CDEFGAB";t.regex=o,t.parse=i,t.build=l,t.midi=p,t.freq=s,t.letter=d,t.acc=m,t.pc=h,t.step=v,t.alt=g,t.chroma=x,t.oct=y});
 
 
-},{}],31:[function(require,module,exports){
+},{}],55:[function(require,module,exports){
 
 module.exports = function (player) {
   /**
@@ -5907,7 +10664,7 @@ function chain (fn1, fn2) {
   return function (a, b, c, d) { fn1(a, b, c, d); fn2(a, b, c, d) }
 }
 
-},{}],32:[function(require,module,exports){
+},{}],56:[function(require,module,exports){
 'use strict'
 
 var player = require('./player')
@@ -5923,7 +10680,7 @@ function SamplePlayer (ac, source, options) {
 if (typeof module === 'object' && module.exports) module.exports = SamplePlayer
 if (typeof window !== 'undefined') window.SamplePlayer = SamplePlayer
 
-},{"./events":31,"./midi":33,"./notes":34,"./player":35,"./scheduler":36}],33:[function(require,module,exports){
+},{"./events":55,"./midi":57,"./notes":58,"./player":59,"./scheduler":60}],57:[function(require,module,exports){
 var midimessage = require('midimessage')
 
 module.exports = function (player) {
@@ -5974,7 +10731,7 @@ module.exports = function (player) {
   return player
 }
 
-},{"midimessage":29}],34:[function(require,module,exports){
+},{"midimessage":53}],58:[function(require,module,exports){
 'use strict'
 
 var note = require('note-parser')
@@ -6012,7 +10769,7 @@ function mapBuffers (buffers, toKey) {
   }, {})
 }
 
-},{"note-parser":37}],35:[function(require,module,exports){
+},{"note-parser":61}],59:[function(require,module,exports){
 /* global AudioBuffer */
 'use strict'
 
@@ -6226,7 +10983,7 @@ function centsToRate (cents) { return cents ? Math.pow(2, cents / 1200) : 1 }
 
 module.exports = SamplePlayer
 
-},{"adsr":22}],36:[function(require,module,exports){
+},{"adsr":46}],60:[function(require,module,exports){
 'use strict'
 
 var isArr = Array.isArray
@@ -6290,7 +11047,7 @@ module.exports = function (player) {
   return player
 }
 
-},{}],37:[function(require,module,exports){
+},{}],61:[function(require,module,exports){
 'use strict'
 
 var REGEX = /^([a-gA-G])(#{1,}|b{1,}|x{1,}|)(-?\d*)\s*(.*)\s*$/
@@ -6441,7 +11198,7 @@ module.exports = parser
  * parser.freq('A') // => null
  */
 
-},{}],38:[function(require,module,exports){
+},{}],62:[function(require,module,exports){
 'use strict'
 
 var load = require('audio-loader')
@@ -6528,7 +11285,7 @@ Soundfont.nameToUrl = nameToUrl
 if (typeof module === 'object' && module.exports) module.exports = Soundfont
 if (typeof window !== 'undefined') window.Soundfont = Soundfont
 
-},{"./legacy":39,"audio-loader":25,"sample-player":32}],39:[function(require,module,exports){
+},{"./legacy":63,"audio-loader":49,"sample-player":56}],63:[function(require,module,exports){
 'use strict'
 
 var parser = require('note-parser')
@@ -6670,7 +11427,7 @@ Soundfont.noteToMidi = parser.midi
 
 module.exports = Soundfont
 
-},{"note-parser":30}],40:[function(require,module,exports){
+},{"note-parser":54}],64:[function(require,module,exports){
 module.exports=[
   "accordion",
   "acoustic_bass",
@@ -6802,7 +11559,7 @@ module.exports=[
   "xylophone"
 ]
 
-},{}],41:[function(require,module,exports){
+},{}],65:[function(require,module,exports){
 (function(root, factory){
 
 	//UMD
@@ -28721,7 +33478,7 @@ module.exports=[
 	
 	return Tone;
 }));
-},{}],42:[function(require,module,exports){
+},{}],66:[function(require,module,exports){
 (function webpackUniversalModuleDefinition(root, factory) {
 	if(typeof exports === 'object' && typeof module === 'object')
 		module.exports = factory();
@@ -55616,7 +60373,7 @@ function (_Element) {
 
 /******/ })["default"];
 });
-},{}],43:[function(require,module,exports){
+},{}],67:[function(require,module,exports){
 'use strict';
 
 var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
@@ -55708,7 +60465,7 @@ var AppBase = function () {
 
 module.exports = AppBase;
 
-},{"./Util":45}],44:[function(require,module,exports){
+},{"./Util":69}],68:[function(require,module,exports){
 'use strict';
 
 var DeviceSupport = function DeviceSupport() {};
@@ -55850,7 +60607,7 @@ DeviceSupport.prototype = {
 
 module.exports = new DeviceSupport();
 
-},{}],45:[function(require,module,exports){
+},{}],69:[function(require,module,exports){
 'use strict';
 
 var Util = {
@@ -55969,7 +60726,7 @@ var Util = {
 
 module.exports = Util;
 
-},{}],46:[function(require,module,exports){
+},{}],70:[function(require,module,exports){
 'use strict';
 
 var Analytics = function Analytics() {};
@@ -56022,7 +60779,7 @@ Analytics.prototype = {
 
 module.exports = new Analytics();
 
-},{}],47:[function(require,module,exports){
+},{}],71:[function(require,module,exports){
 'use strict';
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
@@ -56243,7 +61000,7 @@ var ConfigManager = function () {
 
 module.exports = new ConfigManager(); // SINGLETON
 
-},{}],48:[function(require,module,exports){
+},{}],72:[function(require,module,exports){
 'use strict';
 
 var AppBase = require('./AppBase');
@@ -56276,12 +61033,12 @@ var MusEDCore = {
 
 module.exports = MusEDCore;
 
-},{"./AppBase":43,"./DeviceSupport":44,"./Util":45,"./internal/Analytics":46,"./internal/ConfigManager":47}],49:[function(require,module,exports){
+},{"./AppBase":67,"./DeviceSupport":68,"./Util":69,"./internal/Analytics":70,"./internal/ConfigManager":71}],73:[function(require,module,exports){
 'use strict';
 
 module.exports = require('./js/ButtonGrid');
 
-},{"./js/ButtonGrid":51}],50:[function(require,module,exports){
+},{"./js/ButtonGrid":75}],74:[function(require,module,exports){
 'use strict';
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
@@ -56650,7 +61407,7 @@ Button._keyCount = 0;
 
 module.exports = Button;
 
-},{}],51:[function(require,module,exports){
+},{}],75:[function(require,module,exports){
 (function (Buffer){(function (){
 'use strict';
 
@@ -57301,4683 +62058,4 @@ function addCodeToKeyEvent(event) {
 module.exports = ButtonGrid;
 
 }).call(this)}).call(this,require("buffer").Buffer)
-},{"./Button":50,"buffer":27}],52:[function(require,module,exports){
-module.exports={
-  "title": "Starting demos",
-  "sequence": [
-    {
-      "name": "CMSD · Virtual Piano Duet",
-      "prompt": "Improvise on the black keys with Steve Wogaman. Video streams directly from MusEDLab.",
-      "version": 2,
-      "options": {
-        "volume": 0.5,
-        "midiRoot": 66,
-        "videoSlug": "cmsd",
-        "scaleSlug": "major-pentatonic",
-        "soundSlug": "flute",
-        "scoreSlug": null,
-        "features": {
-          "layout": "1-3-5-8",
-          "audioEngine": "soundfont",
-          "showVideo": true,
-          "showKeyboard": true,
-          "showSounds": true,
-          "allControls": true,
-          "scaleControls": true,
-          "useNoteCaps": true
-        }
-      }
-    },
-    {
-      "name": "James Brown - \"Think\" (loop)",
-      "prompt": "Get on the good foot!",
-      "options": {
-        "volume": 0.8,
-        "features": {
-          "layout": "1-3-5-8",
-          "scaleControls": true,
-          "showTakes": false,
-          "allControls": true,
-          "audioEngine": "soundfont",
-          "showVideo": true,
-          "showScore": false,
-          "showSounds": true,
-          "showKeyboard": true,
-          "useNoteCaps": true
-        },
-        "midiRoot": 62,
-        "videoSlug": "R7iNSUoQ4Lk",
-        "scaleSlug": "minor-pentatonic",
-        "scoreSlug": null,
-        "soundSlug": "flute"
-      },
-      "version": 1
-    }
-  ]
-}
-
-},{}],53:[function(require,module,exports){
-'use strict';
-
-// Import different audio engines we might want to support
-var ClassicSounds = require('./audio/classic/sounds.js');
-var SoundfontSounds = require('./audio/soundfont/sounds.js');
-var Util = require('./util.js');
-var Tone = require('tone');
-
-var NullEngine = function NullEngine() {
-    this.instruments = [{ slug: 'none', name: 'None' }];
-};
-
-NullEngine.prototype = {
-    setInstrument: function setInstrument() {},
-    setMasterVolume: function setMasterVolume() {},
-    noteOn: function noteOn() {},
-    noteOff: function noteOff() {}
-};
-
-/**
- * This class provides a generic wrapper around an Audio Engine, setting up the
- * appropriate engine, and handling all audio-related controls (for now, volume
- * dial and instrument selection).
- */
-
-var AudioControls = function AudioControls(parent) {
-    this.parent = parent;
-
-    this.sounds = new NullEngine();
-    this.config = {
-        engineSlug: 'none',
-        engineConfigs: {
-            'classic': { soundSlug: 'bessie', class: ClassicSounds },
-            'soundfont': { soundSlug: 'flute', class: SoundfontSounds },
-            'none': { soundSlug: 'none', class: NullEngine }
-        }
-    };
-
-    // Publicly-available DOM Nodes
-    this.soundPicker;
-    this.volumeControl;
-
-    // DOM Nodes
-    this._soundPickerMenu;
-    this._volumeControlSlider;
-
-    this.initUI();
-};
-
-AudioControls.prototype = {
-    initUI: function initUI() {
-        this.setupSynthMenu();
-        this.setupVolumeDial();
-    },
-
-    setupSynthMenu: function setupSynthMenu() {
-        this.soundPicker = document.createElement('div');
-        this.soundPicker.classList.add('optionMenu');
-
-        var label = document.createElement('label');
-        label.textContent = 'Sound';
-        this.soundPicker.appendChild(label);
-
-        this._soundPickerMenu = document.createElement('select');
-        this._soundPickerMenu.id = 'synthMenu';
-        this.soundPicker.appendChild(this._soundPickerMenu);
-        var state = document.createElement('span');state.className = 'sound-status';state.setAttribute('role', 'status');this.soundPicker.appendChild(state);
-        document.addEventListener('aq:sound', function (e) {
-            state.textContent = e.detail;
-        });
-
-        var pointerSelection = false;
-        this._soundPickerMenu.addEventListener('pointerdown', function () {
-            pointerSelection = true;
-        });
-        this._soundPickerMenu.addEventListener('keydown', function () {
-            pointerSelection = false;
-        });
-        this._soundPickerMenu.addEventListener('change', function (event) {
-            var selected = event.target.value;
-            // End replay and restore its temporary settings before applying the user's choice.
-            document.dispatchEvent(new CustomEvent('aq:sound-selection'));
-            event.target.value = selected;
-            this.sounds.setInstrument(selected);
-            this.config.engineConfigs[this.config.engineSlug].soundSlug = event.target.value;
-
-            this.parent.sessionManager.logEvent('sound', event.target.value);
-            this.parent.logUpdatedOption('soundSlug', selected);
-            if (pointerSelection) {
-                this.parent.keyboard.keyboardContainer.focus({ preventScroll: true });this.parent.keyboard.buttons.activate();
-            }
-            pointerSelection = false;
-        }.bind(this));
-    },
-
-    setupVolumeDial: function setupVolumeDial() {
-        this.volumeControl = document.createElement('div');
-        this.volumeControl.classList.add('optionMenu');
-
-        var label = document.createElement('label');
-        label.textContent = 'Vol';
-        this.volumeControl.appendChild(label);
-
-        this._volumeControlSlider = nx.add('slider', {
-            w: 28,
-            name: 'volumeDial',
-            parent: 'volumeContainer'
-        });
-        this.volumeControl.appendChild(this._volumeControlSlider.canvas);
-
-        var debouncedUpdate = Util.debounce(function (volume) {
-            this.parent.logUpdatedOption('volume', volume);
-
-            this.parent.sessionManager.logEvent('volume', volume);
-            ga('send', 'event', 'volume', 'set', volume);
-        }.bind(this), 1000);
-
-        this._volumeControlSlider.on("*", function (data) {
-            this.sounds.setMasterVolume(data.value);
-
-            debouncedUpdate(data.value);
-        }.bind(this));
-    },
-
-    resume: function resume() {
-        if (Tone.context.state === 'suspended') Tone.context.resume();
-    },
-
-    noteOn: function noteOn(midiNote) {
-        this.resume();
-        this.sounds.noteOn(midiNote);
-    },
-
-    noteOff: function noteOff(midiNote) {
-        this.sounds.noteOff(midiNote);
-    },
-
-    switchSound: function switchSound(soundSlug, engineSlug) {
-        engineSlug = engineSlug || this.config.engineSlug;
-
-        if (engineSlug != this.config.engineSlug && engineSlug in this.config.engineConfigs) {
-            this.sounds = new this.config.engineConfigs[engineSlug].class();
-            this.config.engineSlug = engineSlug;
-
-            // Clear out old instruments
-            this._soundPickerMenu.innerHTML = '';
-
-            for (var i = 0; i < this.sounds.instruments.length; i++) {
-                var instrument = this.sounds.instruments[i];
-                var option = document.createElement('option');
-                option.value = instrument.slug;
-                option.innerHTML = instrument.name;
-
-                this._soundPickerMenu.appendChild(option);
-            }
-        }
-
-        var foundSound = false;
-        for (var i = 0; i < this.sounds.instruments.length; i++) {
-            if (this.sounds.instruments[i].slug === soundSlug) {
-                this._soundPickerMenu.value = soundSlug;
-
-                // TODO: Evaluate whether we need to trigger all of these...
-                this.sounds.setInstrument(soundSlug);
-                this.config.engineConfigs[this.config.engineSlug].soundSlug = soundSlug;
-
-                this.parent.sessionManager.logEvent('sound', soundSlug);
-                this.parent.logUpdatedOption('soundSlug', soundSlug);
-
-                foundSound = true;
-                break;
-            }
-        }
-
-        if (foundSound) {
-            this.config.engineConfigs[this.config.engineSlug].soundSlug = soundSlug;
-        } else {
-            this.switchSound(this.config.engineConfigs[this.config.engineSlug].soundSlug);
-        }
-    },
-
-    toggleSoundPicker: function toggleSoundPicker(show) {
-        show = show && this.config.engineSlug != 'none';
-
-        this.soundPicker.classList.toggle('hidden', !show);
-    }
-};
-
-Object.defineProperty(AudioControls.prototype, 'volume', {
-    set: function set(value) {
-        if (!this.parent.isMobile) {
-            this.sounds.setMasterVolume(value);
-            this._volumeControlSlider.val.value = value;
-            this._volumeControlSlider.draw();
-        }
-    }
-});
-
-module.exports = AudioControls;
-
-},{"./audio/classic/sounds.js":60,"./audio/soundfont/sounds.js":62,"./util.js":74,"tone":41}],54:[function(require,module,exports){
-'use strict';
-
-var migrate = require('./configurationMigrator');
-var catalog = require('../data/presets.json');
-function PresetPicker(app) {
-  var _this = this;
-
-  this.app = app;this.sequence = [];
-  this.container = document.createElement('div');this.container.className = 'preset-panel hidden';
-  this.showPresetsButton = document.getElementById('logo2');
-  this.showPresetsButton.setAttribute('role', 'button');this.showPresetsButton.tabIndex = 0;
-  this.showPresetsButton.addEventListener('click', function () {
-    return _this.toggleVisibility();
-  });
-  this.showPresetsButton.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();_this.toggleVisibility();
-    }
-  });
-}
-PresetPicker.prototype.init = function () {
-  var _this2 = this;
-
-  this.sequence = catalog.sequence.map(function (p) {
-    return Object.assign({}, p, { options: migrate(p.version, p.options) });
-  });
-  this.showPresetsButton.classList.remove('hidden');
-  var title = document.createElement('h2');title.textContent = catalog.title;this.container.appendChild(title);
-  var list = document.createElement('ul');this.container.appendChild(list);
-  this.sequence.forEach(function (p, i) {
-    var item = document.createElement('li'),
-        button = document.createElement('button'),
-        name = document.createElement('strong'),
-        prompt = document.createElement('p');
-    button.type = 'button';button.className = 'app-preset-link';name.textContent = p.name;prompt.textContent = p.prompt;
-    var preview = document.createElement('span'),
-        copy = document.createElement('span');preview.className = 'preset-preview';copy.className = 'preset-copy';
-    var media = document.createElement(i === 0 ? 'video' : 'img');media.className = 'preset-thumbnail';
-    if (i === 0) {
-      media.muted = true;media.playsInline = true;media.preload = 'metadata';media.tabIndex = -1;media.setAttribute('aria-hidden', 'true');media.dataset.previewSrc = 'https://apps.musedlab.org/virtualduet/cmsd/media/piano.mp4';media.addEventListener('loadedmetadata', function () {
-        media.currentTime = Math.min(1, media.duration / 2);
-      });
-    } else {
-      media.alt = '';media.dataset.previewSrc = 'https://i.ytimg.com/vi/R7iNSUoQ4Lk/mqdefault.jpg';
-    }
-    media.addEventListener('error', function () {
-      media.hidden = true;
-    });
-    var play = document.createElement('span');play.className = 'preset-play';play.textContent = '▶';play.setAttribute('aria-hidden', 'true');
-    preview.appendChild(media);preview.appendChild(play);copy.appendChild(name);copy.appendChild(prompt);button.appendChild(preview);button.appendChild(copy);button.addEventListener('click', function () {
-      return _this2.selectPreset(i, true);
-    });item.appendChild(button);list.appendChild(item);
-  });
-};
-PresetPicker.prototype.selectPreset = function (index, hide) {
-  var p = this.sequence[index];if (!p) return;
-  this.app.releaseNotes();document.dispatchEvent(new CustomEvent('aq:configuration'));
-  // All presets start from complete defaults, so missing fields cannot leak from another preset.
-  var o = JSON.parse(JSON.stringify(p.options));
-  var features = Object.assign({ layout: '1-3-5-8', scaleControls: true, allControls: true, audioEngine: 'soundfont', showVideo: true, showScore: false, showSounds: true, showKeyboard: true, useNoteCaps: true }, o.features);
-  this.app.configManager.onReload(Object.assign({ volume: .5, soundSlug: 'flute', scaleSlug: 'minor-pentatonic', midiRoot: 62, scoreSlug: null }, o, { features: features }));
-  this.currentIndex = index;this.showPresetsButton.textContent = p.name + ' · Presets';
-  if (hide) this.toggleVisibility(false);
-};
-PresetPicker.prototype.toggleVisibility = function (show) {
-  if (show == null) show = this.container.classList.contains('hidden');
-  if (show) this.container.querySelectorAll('[data-preview-src]').forEach(function (media) {
-    media.src = media.dataset.previewSrc;delete media.dataset.previewSrc;
-  });
-  this.container.classList.toggle('hidden', !show);this.showPresetsButton.setAttribute('aria-expanded', String(show));
-};
-module.exports = PresetPicker;
-
-},{"../data/presets.json":52,"./configurationMigrator":63}],55:[function(require,module,exports){
-'use strict';
-
-var Theory = require('./controller/theory.js');
-
-/**
- * Scale Picker Control. Consists of two menus: one for scale type, and the other
- * for scale within that type.
- */
-var ScalePicker = function ScalePicker(parent) {
-    this.parent = parent;
-    this.keyMapper = parent.keyboard.mapping;
-
-    // Externally-visible properties
-    this._scaleSlug = '';
-
-    // Publicly-available DOM nodes
-    this.container;
-
-    // DOM Nodes
-    this._scaleTypeMenu;
-    this._scaleMenu;
-};
-
-ScalePicker.prototype = {
-    /**
-     * Initialize the two drop-down menus
-     */
-    init: function init() {
-        // Set up HTML container
-        this.container = document.createElement('div');
-        this.container.classList.add('scaleContainer');
-        this.container.classList.add('row');
-
-        // Set up Scale Type Menu
-        var scaleTypeContainer = document.createElement('div');
-        scaleTypeContainer.classList.add('optionMenu');
-        this.container.appendChild(scaleTypeContainer);
-
-        var scaleTypeLabel = document.createElement('label');
-        scaleTypeLabel.textContent = 'Scale Type';
-        scaleTypeContainer.appendChild(scaleTypeLabel);
-
-        this._scaleTypeMenu = document.createElement('select');
-        this._scaleTypeMenu.id = 'scaleTypeMenu';
-        scaleTypeContainer.appendChild(this._scaleTypeMenu);
-
-        for (var i = 0; i < Theory.scaleGroups.length; i++) {
-            var option = document.createElement('option');
-            option.value = Theory.scaleGroups[i].slug;
-            option.innerHTML = Theory.scaleGroups[i].name;
-            this._scaleTypeMenu.appendChild(option);
-        }
-
-        this._scaleTypeMenu.addEventListener('change', function (event) {
-            this._populateScaleMenu(event.target.value);
-            this._updateScale();
-            ga('send', 'event', 'scale-type', 'select', event.target.value);
-        }.bind(this));
-
-        // Set up Scale Menu
-        var scaleContainer = document.createElement('div');
-        scaleContainer.classList.add('optionMenu');
-        this.container.appendChild(scaleContainer);
-
-        var scaleLabel = document.createElement('label');
-        scaleLabel.textContent = 'Scale';
-        scaleContainer.appendChild(scaleLabel);
-
-        this._scaleMenu = document.createElement('select');
-        this._scaleMenu.id = 'scaleMenu';
-        scaleContainer.appendChild(this._scaleMenu);
-
-        this._scaleMenu.addEventListener('change', function (event) {
-            this._updateScale();
-            ga('send', 'event', 'scale', 'select', event.target.value);
-        }.bind(this));
-
-        this._populateScaleMenu(this._scaleTypeMenu.value);
-    },
-
-    /**
-     * A MIDI note identifying the root for the current scale
-     * @type {string}
-     */
-    isValidScale: function isValidScale(value) {
-        return !!Theory.slugToPitchSet[value];
-    },
-
-
-    get scale() {
-        return this._scale;
-    },
-
-    set scale(value) {
-        if (this._scale !== value) {
-            this._scale = value;
-
-            var pitchSet = Theory.slugToPitchSet[this._scale];
-            var scaleGroupSlug = '';
-
-            // Search through our pitch sets and find the one that contains our scale
-            for (var i = 0; i < Theory.scaleGroups.length; ++i) {
-                if (Theory.scaleGroups[i].pitchSets.indexOf(pitchSet) !== -1) {
-                    scaleGroupSlug = Theory.scaleGroups[i].slug;
-                    break;
-                }
-            }
-
-            // Update the scale type menu, if needed
-            if (this._scaleTypeMenu.value !== scaleGroupSlug) {
-                this._scaleTypeMenu.value = scaleGroupSlug;
-
-                this._populateScaleMenu(scaleGroupSlug);
-            }
-
-            // Update the scale menu
-            this._scaleMenu.value = this._scale;
-
-            // Update the key mapper
-            this.keyMapper.pitchSet = pitchSet;
-        }
-    },
-
-    toggleVisibility: function toggleVisibility(show) {
-        this.container.classList.toggle('hidden', !show);
-    },
-
-    /**
-     * [_populateScaleMenu description]
-     * @param  {[type]} scaleType [description]
-     * @return {[type]}           [description]
-     */
-    _populateScaleMenu: function _populateScaleMenu(scaleType) {
-        // Remove existing options
-        this._scaleMenu.innerHTML = '';
-
-        var pitchSets = Theory.slugToScaleGroup[scaleType].pitchSets;
-
-        for (var i = 0; i < pitchSets.length; i++) {
-            var pitchSet = pitchSets[i];
-
-            var option = document.createElement('option');
-            option.value = pitchSet.slug;
-            option.innerHTML = pitchSet.name ? pitchSet.name : Theory.slugToScale[pitchSet.scaleSlug].modeNames[pitchSet.mode];
-
-            this._scaleMenu.appendChild(option);
-        }
-
-        this._scaleMenu.selectedIndex = Theory.slugToScaleGroup[scaleType].defaultScaleIndex;
-    },
-
-    /**
-     * This function is used only when the scale is updated by the user (as opposed to through
-     * the scale property). It logs the fact that this update occurred to session/analytics/etc.
-     */
-    _updateScale: function _updateScale() {
-        this._scale = this._scaleMenu.value;
-
-        var pitchSet = Theory.slugToPitchSet[this._scale];
-
-        this.keyMapper.pitchSet = pitchSet;
-
-        this.parent.logUpdatedOption('scaleSlug', this._scale);
-        this.parent.sessionManager.logEvent('scale', this._scale);
-    }
-};
-
-module.exports = ScalePicker;
-
-},{"./controller/theory.js":67}],56:[function(require,module,exports){
-'use strict';
-
-/**
- * Used for displaying a score image
- */
-var Score = function Score(parent) {
-    this.parent = parent;
-
-    // Externally-visible properties
-    this._scoreSrc = null;
-
-    // Publicly-available DOM Node
-    this.container;
-
-    // DOM Nodes
-    this._scoreImage;
-};
-
-Score.prototype = {
-    /**
-     * Initialize the different UI elements attached to the score image
-     */
-    init: function init() {
-        this.container = document.createElement('div');
-        this.container.id = 'scoreImageContainer';
-
-        this._scoreImage = document.createElement('img');
-        this.container.appendChild(this._scoreImage);
-
-        this._scoreImage.addEventListener('load', this.parent.resize.bind(this.parent));
-    },
-
-    toggleVisibility: function toggleVisibility(show) {
-        this.container.classList.toggle('hidden', !show);
-    },
-
-    get scoreSrc() {
-        return this._scoreSrc;
-    },
-
-    set scoreSrc(value) {
-        if (this._scoreSrc !== value) {
-            this._scoreSrc = value;
-            this._scoreImage.src = this._scoreSrc;
-        }
-    }
-};
-
-module.exports = Score;
-
-},{}],57:[function(require,module,exports){
-'use strict';
-
-var CMSD_VIDEO = 'https://apps.musedlab.org/virtualduet/cmsd/media/piano.mp4';
-function parseVideo(value) {
-  value = String(value || '').trim();if (value === 'cmsd' || value === CMSD_VIDEO) return { id: 'cmsd', start: 0 };if (/^[\w-]{11}$/.test(value)) return { id: value, start: 0 };
-  try {
-    var u = new URL(value),
-        host = u.hostname.toLowerCase();if (!['https:', 'http:'].includes(u.protocol)) return null;var id = void 0;
-    if (host === 'youtu.be') id = u.pathname.split('/')[1];else if (['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtube-nocookie.com', 'www.youtube-nocookie.com'].includes(host)) {
-      var parts = u.pathname.split('/').filter(Boolean);id = parts[0] === 'watch' ? u.searchParams.get('v') : ['embed', 'shorts', 'live', 'v'].includes(parts[0]) ? parts[1] : null;
-    }
-    if (!/^[\w-]{11}$/.test(id || '')) return null;
-    var t = u.searchParams.get('t') || u.searchParams.get('start') || u.hash.replace(/^#t=/, '');var start = 0;
-    if (/^\d+(\.\d+)?$/.test(t)) start = Number(t);else {
-      var m = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/.exec(t);if (m) start = Number(m[1] || 0) * 3600 + Number(m[2] || 0) * 60 + Number(m[3] || 0);
-    }
-    return { id: id, start: Math.min(86400, start) };
-  } catch (_) {
-    return null;
-  }
-}
-var apiPromise = void 0;
-function loadAPI() {
-  if (window.YT && window.YT.Player) return Promise.resolve(window.YT);
-  if (apiPromise) return apiPromise;
-  apiPromise = new Promise(function (resolve, reject) {
-    var tag = document.createElement('script');tag.src = 'https://www.youtube.com/iframe_api';
-    var timeout = setTimeout(function () {
-      apiPromise = null;tag.remove();reject(new Error('YouTube did not respond. Check your connection and try Load video again.'));
-    }, 15000);
-    window.onYouTubeIframeAPIReady = function () {
-      clearTimeout(timeout);resolve(window.YT);
-    };
-    tag.onerror = function () {
-      clearTimeout(timeout);apiPromise = null;tag.remove();reject(new Error('YouTube could not load. You can still play the instrument.'));
-    };document.head.appendChild(tag);
-  });return apiPromise;
-}
-function Video(parent) {
-  this.parent = parent;this._enabled = true;this._videoSlug = '';this.generation = 0;this.start = 0;this.player = null;this.ready = false;this._showVideoURLControl = true;
-}
-Video.parseVideo = parseVideo;
-Video.prototype.init = function () {
-  var _this = this;
-
-  this.container = document.createElement('div');this.container.className = 'videoBlk';
-  var form = document.createElement('form');this.form = form;form.className = 'video-form';
-  this._videoURL = document.createElement('input');this._videoURL.type = 'text';this._videoURL.placeholder = 'YouTube link or video ID';this._videoURL.setAttribute('aria-label', 'YouTube link or video ID');
-  this.loadButton = document.createElement('button');this.loadButton.type = 'submit';this.loadButton.textContent = 'Load video';
-  form.appendChild(this._videoURL);form.appendChild(this.loadButton);this.container.appendChild(form);
-  this.status = document.createElement('p');this.status.className = 'video-status';this.status.setAttribute('role', 'status');this.container.appendChild(this.status);
-  this.mount = document.createElement('div');this.mount.id = 'aq-youtube-player';this.container.appendChild(this.mount);
-  this.watch = document.createElement('a');this.watch.textContent = 'Open on YouTube ↗';this.watch.target = '_blank';this.watch.rel = 'noopener';this.container.appendChild(this.watch);
-  var returnKey = document.createElement('button');returnKey.type = 'button';returnKey.className = 'return-keyboard';returnKey.textContent = 'Return to keyboard';returnKey.addEventListener('click', function () {
-    return _this.parent.keyboard.keyboardContainer.focus({ preventScroll: true });
-  });this.container.appendChild(returnKey);
-  form.addEventListener('submit', function (e) {
-    e.preventDefault();var parsed = parseVideo(_this._videoURL.value || _this._videoSlug);if (!parsed) {
-      _this.status.textContent = 'Enter a valid YouTube link or 11-character video ID.';return;
-    }_this.videoSlug = parsed.id;_this.start = parsed.start;_this.load();
-  });
-  var toggle = document.getElementById('videoToggle');toggle.tabIndex = 0;toggle.setAttribute('role', 'button');toggle.setAttribute('aria-label', 'Show or hide video');toggle.addEventListener('click', function () {
-    _this.enabled = !_this.enabled;
-  });
-  toggle.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();_this.enabled = !_this.enabled;
-    }
-  });
-};
-Video.prototype.loadNative = function () {
-  var _this2 = this;
-
-  this.lastError = null;
-  if (!this.native) {
-    var _video = document.createElement('video');_video.controls = true;_video.playsInline = true;_video.loop = true;_video.preload = 'metadata';_video.src = CMSD_VIDEO;_video.setAttribute('aria-label', 'CMSD piano duet video');this.mount.replaceChildren(_video);this.native = _video;
-    _video.addEventListener('error', function () {
-      _this2.lastError = 'native';_this2.status.textContent = 'CMSD video could not load. You can still play the instrument.';
-    });
-    _video.addEventListener('play', function () {
-      _this2.status.textContent = 'Playing · use the keyboard to play along';
-    });
-    this.player = { pauseVideo: function pauseVideo() {
-        return _video.pause();
-      }, playVideo: function playVideo() {
-        return _video.play().catch(function () {
-          _this2.status.textContent = 'Press Play in the video to begin.';
-        });
-      }, seekTo: function seekTo(t) {
-        _this2.start = t;if (_video.readyState >= 1) _video.currentTime = t;
-      }, getCurrentTime: function getCurrentTime() {
-        return _video.currentTime;
-      }, getPlayerState: function getPlayerState() {
-        return !_video.paused && _video.readyState >= 3 ? 1 : 2;
-      }, getVideoData: function getVideoData() {
-        return { video_id: 'cmsd' };
-      }, destroy: function destroy() {
-        _video.pause();_video.removeAttribute('src');_video.load();_video.remove();
-      } };
-  }
-  var video = this.native;
-  var begin = function begin() {
-    if (_this2.native !== video) return;video.currentTime = _this2.start || 0;_this2.ready = true;_this2.player.playVideo();
-  };
-  if (video.readyState >= 1) {
-    begin();return Promise.resolve();
-  }
-  if (this.loading) return this.loading;
-  this.loading = new Promise(function (resolve) {
-    var finish = function finish() {
-      clearTimeout(timer);video.removeEventListener('loadedmetadata', loaded);video.removeEventListener('error', failed);if (_this2.native === video) _this2.loading = null;resolve();
-    };
-    var loaded = function loaded() {
-      begin();finish();
-    };
-    var failed = function failed() {
-      if (_this2.native === video) {
-        _this2.lastError = 'native';_this2.status.textContent = 'CMSD video could not load. You can still play the instrument.';
-      }finish();
-    };
-    var timer = setTimeout(failed, 15000);video.addEventListener('loadedmetadata', loaded, { once: true });video.addEventListener('error', failed, { once: true });
-  });return this.loading;
-};
-Video.prototype.load = function () {
-  var _this3 = this;
-
-  if (this._videoSlug === 'cmsd') return this.loadNative();
-  var generation = this.generation;
-  this.lastError = null;this.status.textContent = 'Loading YouTube…';
-  if (this.ready) {
-    this.player.loadVideoById({ videoId: this._videoSlug, startSeconds: this.start });this.status.textContent = 'Press Play if the video does not start.';return Promise.resolve();
-  }
-  if (this.loading) return this.loading;
-  this.loading = loadAPI().then(function (YT) {
-    return new Promise(function (resolve, reject) {
-      if (generation !== _this3.generation) {
-        resolve();return;
-      }
-      var deadline = setTimeout(function () {
-        if (generation !== _this3.generation) {
-          resolve();return;
-        }_this3.ready = false;if (_this3.player) _this3.player.destroy();_this3.mount = document.createElement('div');_this3.mount.id = 'aq-youtube-player';_this3.container.insertBefore(_this3.mount, _this3.watch);reject(new Error('YouTube player did not become ready. Check your connection or open the video on YouTube.'));
-      }, 12000);
-      _this3.player = new YT.Player(_this3.mount, { width: '100%', height: 270, videoId: _this3._videoSlug, playerVars: { origin: location.origin, playsinline: 1, disablekb: 1, controls: 1, start: _this3.start }, events: {
-          onReady: function onReady(e) {
-            clearTimeout(deadline);if (generation !== _this3.generation) {
-              e.target.destroy();resolve();return;
-            }_this3.ready = true;_this3.loading = null;e.target.loadVideoById({ videoId: _this3._videoSlug, startSeconds: _this3.start });_this3.status.textContent = 'Press Play in the video to begin.';resolve();
-          },
-          onStateChange: function onStateChange(e) {
-            if (e.data === 1) _this3.status.textContent = 'Playing · use the keyboard to play along';else if (e.data === 5) _this3.status.textContent = 'Press Play in the video to begin.';
-          },
-          onError: function onError(e) {
-            _this3.lastError = e.data;var errors = { 2: 'Invalid video link.', 5: 'This browser cannot play this video.', 100: 'This video was removed or is private.', 101: 'YouTube is refusing embedded playback for this video.', 150: 'YouTube is refusing embedded playback for this video.', 153: 'YouTube could not identify this page. Open this preview directly in your browser.' };_this3.status.textContent = (errors[e.data] || 'YouTube could not play this video.') + ' Try another video or open it on YouTube.';
-          },
-          onAutoplayBlocked: function onAutoplayBlocked() {
-            _this3.status.textContent = 'Press Play in the video to begin.';
-          }
-        } });
-    });
-  }).catch(function (e) {
-    if (generation === _this3.generation) {
-      _this3.loading = null;_this3.status.textContent = e.message;
-    }
-  });return this.loading;
-};
-Object.defineProperties(Video.prototype, {
-  videoSlug: {
-    get: function get() {
-      return this._videoSlug;
-    },
-    set: function set(value) {
-      var p = parseVideo(value);if (!p) return;var changed = p.id !== this._videoSlug,
-          native = p.id === 'cmsd';
-      if (changed && (this._videoSlug === 'cmsd' || native)) {
-        this.generation++;if (this.player) this.player.destroy();this.player = null;this.native = null;this.ready = false;this.loading = null;this.mount.remove();this.mount = document.createElement('div');this.mount.id = 'aq-youtube-player';this.container.insertBefore(this.mount, this.watch);
-      }
-      this._videoSlug = p.id;this.form.hidden = native;this.watch.href = native ? CMSD_VIDEO : 'https://www.youtube.com/watch?v=' + p.id;this.watch.textContent = native ? 'CMSD · Steve Wogaman · Open video ↗' : 'Open on YouTube ↗';this._videoURL.value = native ? CMSD_VIDEO : this.watch.href;
-      if (changed) {
-        this.lastError = null;this.start = 0;this.status.textContent = native ? 'CMSD piano duet · Composition and performance by Steve Wogaman.' : 'Video selected. Choose Load video to connect to YouTube.';if (this.ready && !native) this.player.cueVideoById(p.id, 0);if (native && this.container.dataset.playMode === 'video') this.load();
-      }
-      this.parent.logUpdatedOption('videoSlug', p.id);
-    }
-  },
-  enabled: {
-    get: function get() {
-      return this._enabled;
-    },
-    set: function set(v) {
-      this._enabled = !!v;this.container.style.display = v ? 'flex' : 'none';if (!v && this.ready) this.player.pauseVideo();
-    }
-  },
-  showVideoURLControl: {
-    get: function get() {
-      return this._showVideoURLControl;
-    },
-    set: function set(v) {
-      this._showVideoURLControl = v;
-    }
-  }
-});
-Video.prototype.resize = function () {};
-module.exports = Video;
-
-},{}],58:[function(require,module,exports){
-'use strict';
-
-var Aqwertyon = require('./aqwertyon.js');
-window.aqTheory = require('./theory-modern');
-
-var configurationMigrator = require('./configurationMigrator.js');
-
-var env = 'preview';
-var sourceSlug = env == 'dev' ? 'dev' : env == 'test' ? 'uat' : 'pub'; // TODO: implement as AppBase.prototype.sourceSlug
-
-var audioEngineDefault = 'soundfont';
-
-// though supported, we can't assume soundfont assets are available offline, so don't default to what might fail
-if (Aqwertyon.prototype.isLocal) {
-    audioEngineDefault = 'classic'; // developer must manually comment this out to change default after adding soundfont assets to a MusEDBox
-}
-
-var sharedVideo = new URLSearchParams(location.search).get('video');
-var useCMSDDefault = !sharedVideo || sharedVideo === 'cmsd';
-var videoDefault = 'cmsd'; // Existing MusEDLab-hosted CMSD piano duet
-var soundDefault = audioEngineDefault == 'soundfont' ? 'flute' : 'bessie';
-var rootDefault = audioEngineDefault == 'soundfont' ? useCMSDDefault ? 66 : 62 : 50; // F-sharp4 for CMSD; legacy D4 for explicit YouTube links
-var presetsDefault = window.self == window.top ? 'HJ8BqlWJb' : ''; // Ethan's landing page; don't use if embedded
-
-window.appInfo = {
-    mainClass: Aqwertyon,
-
-    analytics: {
-        gaID: '',
-        hotjarID: parseInt(''),
-        isLocal: Aqwertyon.prototype.isLocal
-    },
-
-    deviceSupport: {
-        required: ['webAudio'],
-        excluded: [],
-        minimumSize: { width: 0, height: 0 },
-        custom: []
-    },
-
-    configuration: {
-        version: 2,
-
-        migrationFunction: configurationMigrator,
-
-        options: {
-            sourceSlug: { type: 'string', inTemplate: false, urlParam: 'source', inUI: false, default: sourceSlug },
-            userSlug: { type: 'string', inTemplate: false, urlParam: 'user', inUI: false },
-            sessionSlug: { type: 'string', inTemplate: false, urlParam: 'session', inUI: false },
-            cloneSession: { type: 'bool', inTemplate: false, urlParam: 'clone', inUI: false, default: false },
-            configure: { type: 'bool', inTemplate: false, urlParam: 'configure', inUI: false, default: false },
-            scoreSlug: { type: 'string', inTemplate: true, urlParam: 'score', inUI: false },
-            scaleSlug: { type: 'string', inTemplate: true, urlParam: 'scale', inUI: true, default: useCMSDDefault ? 'major-pentatonic' : 'minor-pentatonic' },
-            midiRoot: { type: 'int', inTemplate: true, urlParam: 'root', inUI: true, default: rootDefault },
-            videoSlug: { type: 'string', inTemplate: true, urlParam: 'video', inUI: true, default: videoDefault },
-            soundSlug: { type: 'string', inTemplate: true, urlParam: 'sound', inUI: true, default: soundDefault },
-            presetsSlug: { type: 'string', inTemplate: false, urlParam: 'presets', inUI: true, default: presetsDefault },
-            features: {
-                type: 'object',
-                properties: {
-                    audioEngine: { type: 'string', inTemplate: true, urlParam: 'audio-engine', inUI: false, default: audioEngineDefault, enum: ['none', 'classic', 'soundfont'] },
-                    showScore: { type: 'bool', inTemplate: true, urlParam: 'show-score', inUI: false, default: false },
-                    showVideo: { type: 'bool', inTemplate: true, urlParam: 'show-video', inUI: true, default: true },
-                    showKeyboard: { type: 'bool', inTemplate: true, urlParam: 'show-keyboard', inUI: false, default: true },
-                    showTakes: { type: 'bool', inTemplate: true, urlParam: 'show-takes', inUI: false, default: true },
-                    showSounds: { type: 'bool', inTemplate: true, urlParam: 'show-sounds', inUI: false, default: true },
-                    allControls: { type: 'bool', inTemplate: true, urlParam: 'controls', inUI: false, default: true },
-                    scaleControls: { type: 'bool', inTemplate: true, urlParam: 'scale-controls', inUI: false, default: true },
-                    layout: { type: 'string', inTemplate: true, urlParam: 'layout', inUI: false, default: '1-3-5-8' },
-                    labelMode: { type: 'string', inTemplate: true, urlParam: 'labels', inUI: true, default: '' },
-                    useNoteCaps: { type: 'bool', inTemplate: true, urlParam: 'notecaps', inUI: true, default: true },
-                    override: { type: 'bool', inTemplate: false, urlParam: 'override', inUI: false, default: false }
-                }
-            },
-            volume: { type: 'float', inTemplate: true, urlParam: 'volume', inUI: true, default: 0.5 }
-        }
-    }
-};
-
-},{"./aqwertyon.js":59,"./configurationMigrator.js":63,"./theory-modern":71}],59:[function(require,module,exports){
-'use strict';
-
-var _slicedToArray = function () { function sliceIterator(arr, i) { var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"]) _i["return"](); } finally { if (_d) throw _e; } } return _arr; } return function (arr, i) { if (Array.isArray(arr)) { return arr; } else if (Symbol.iterator in Object(arr)) { return sliceIterator(arr, i); } else { throw new TypeError("Invalid attempt to destructure non-iterable instance"); } }; }();
-
-var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
-
-var _get = function get(object, property, receiver) { if (object === null) object = Function.prototype; var desc = Object.getOwnPropertyDescriptor(object, property); if (desc === undefined) { var parent = Object.getPrototypeOf(object); if (parent === null) { return undefined; } else { return get(parent, property, receiver); } } else if ("value" in desc) { return desc.value; } else { var getter = desc.get; if (getter === undefined) { return undefined; } return getter.call(receiver); } };
-
-function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
-
-function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
-
-function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
-
-// External dependencies
-var MusED = require('mused-app-core');
-var Tone = require('tone');
-
-// General infrastructure modules
-var SessionManager = require('./sessionManager.js');
-var Timing = require('./timing.js');
-var MIDI = require('./makemidi.js');
-
-// Controls
-var AudioControls = require('./AudioControls.js');
-var Keyboard = require('./controller/Keyboard');
-var ScalePicker = require('./ScalePicker.js');
-var RootPicker = require('./controller/RootPicker');
-var PresetPicker = require('./PresetPicker.js');
-
-// Visualizations
-var Video = require('./Video.js');
-var Score = require('./Score.js');
-
-var Aqwertyon = function (_MusED$AppBase) {
-    _inherits(Aqwertyon, _MusED$AppBase);
-
-    _createClass(Aqwertyon, [{
-        key: 'isMobile',
-        get: function get() {
-            return _get(Aqwertyon.prototype.__proto__ || Object.getPrototypeOf(Aqwertyon.prototype), 'isMobile', this) || navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
-        }
-    }]);
-
-    function Aqwertyon(configManager) {
-        _classCallCheck(this, Aqwertyon);
-
-        var _this = _possibleConstructorReturn(this, (Aqwertyon.__proto__ || Object.getPrototypeOf(Aqwertyon)).call(this, configManager));
-
-        var app = _this;
-
-        _this.imageHost = "https://s3.amazonaws.com/musedlab-aqwertyon/pwym/";
-        _this.sessionManager = new SessionManager(_this.options.sourceSlug);
-        _this.takesMenu = null;
-        _this.state = '';
-
-        // Controls
-        _this.keyboard = new Keyboard(_this);
-        _this.audioControls = new AudioControls(_this);
-        _this.scalePicker = new ScalePicker(_this);
-        _this.rootPicker = new RootPicker(_this);
-        _this.presetPicker = new PresetPicker(_this);
-
-        // Visualizations
-        _this.video = new Video(_this);
-        _this.scoreImage = new Score(_this);
-
-        _this.playingTake = false;
-        _this.timing = new Timing();
-        _this.timing.onProgress = _this.handleProgress.bind(_this);
-        _this.timing.setEventCallback('note', _this._simulateAttack.bind(_this), _this._simulateRelease.bind(_this));
-        _this.timing.setEventCallback('take', _this._handleTakeStart.bind(_this), _this._handleTakeEnd.bind(_this));
-
-        _this.init();
-        return _this;
-    }
-
-    _createClass(Aqwertyon, [{
-        key: 'init',
-        value: function init() {
-            MIDI.init();
-
-            if (this.isMobile) {
-                document.body.classList.add('mobile');
-            }
-
-            if (this.options.sessionSlug) {
-                var note = document.createElement('p');note.className = 'preview-label';
-                note.textContent = 'Historical sessions are not loaded in this preview. This instrument uses the link’s settings only.';
-                document.getElementById('main').before(note);
-            }
-            // Preview sessions and melodies stay local; never create or overwrite legacy CMS records.
-            this.sessionManager.offline = true;
-            this.sessionManager.logEvent = function () {};
-            this.sessionManager.saveOption = function () {};
-            this.initUI(false);
-        }
-    }, {
-        key: 'initUI',
-        value: function initUI(newSession) {
-            var self = this;
-
-            if (this.isEmbedded) {
-                document.body.classList.add('embed');
-            }
-
-            this.keyboard.init().then(function () {
-                // Old-style setup functions
-                //self.setupTakesMenu();
-
-                // New-style module inits
-                self.scalePicker.init();
-                self.rootPicker.init();
-                self.video.init();
-                self.scoreImage.init();
-
-                if (true) {
-                    // Presets also work on touch devices
-                    self.presetPicker.init(self.options.presetsSlug, newSession);
-                }
-
-                // Add Nexus UI Stylesheet
-                nx.addStylesheet();
-
-                $("#copy-shareURL").on('click', function (event) {
-                    $('#shareURL').select();
-
-                    if (document.execCommand('copy')) {
-                        // TODO: how to let the user know?
-                    } else {
-                        console.log('unable to copy');
-                    }
-                });
-
-                window.addEventListener('resize', self.resize.bind(self));
-
-                self.layout();
-                self.reconfigure();
-                document.dispatchEvent(new CustomEvent('aq:ready'));
-                self.updateShare();
-            });
-        }
-    }, {
-        key: 'resize',
-        value: function resize() {
-            // Resize AQ keyboard
-            // var keyWidth = document.getElementById('keyboardContainer').offsetWidth;
-            // if(keyWidth != this.aqKeyboard.width) {
-            //     var keyHeight = keyWidth * (268 / 960);
-            //     //this.aqKeyboard.resize(keyWidth, keyHeight);
-            //     this.volumeDial.resize(32, Math.min(120, keyHeight));
-            // }
-
-            // Resize root picker
-            // this.rootPicker.resize();
-
-
-            // Resize video
-            this.video.resize();
-
-            if (this.isEmbedded) {
-                parent.postMessage(document.body.offsetHeight, '*');
-            }
-        }
-    }, {
-        key: 'updateShare',
-        value: function updateShare() {
-            var u = new URL(location.href);['session', 'clone', 'user', 'source'].forEach(function (k) {
-                return u.searchParams.delete(k);
-            });
-            var input = document.getElementById('shareURL');if (input) input.value = u.href;
-        }
-    }, {
-        key: 'noteOn',
-        value: function noteOn(midiNote, buttonName) {
-            if (!Number.isInteger(midiNote) || midiNote < 0 || midiNote > 127) return;
-            if (window.aqNotebook && window.aqNotebook.replay.playing()) window.aqNotebook.stop();
-            if (Tone.context.state === 'suspended') Tone.context.resume();
-            if (this.audioControls.sounds._currInstrument === null) return;
-            this._held = this._held || new Map();var token = buttonName || String(midiNote);
-            if (this._held.has(token)) return;
-            var sounding = Array.from(this._held.values()).includes(midiNote);
-            this._held.set(token, midiNote);
-            if (!sounding) this.audioControls.noteOn(midiNote);
-            MIDI.send('attack', midiNote, 127);
-            document.dispatchEvent(new CustomEvent('aq:note', { detail: { type: 'on', midi: midiNote, code: token } }));
-        }
-    }, {
-        key: 'noteOff',
-        value: function noteOff(midiNote, buttonName) {
-            var token = buttonName || String(midiNote);this._held = this._held || new Map();
-            if (!this._held.has(token)) return;
-            midiNote = this._held.get(token);this._held.delete(token);
-            if (!Array.from(this._held.values()).includes(midiNote)) this.audioControls.noteOff(midiNote);
-            MIDI.send('release', midiNote, 0);
-            document.dispatchEvent(new CustomEvent('aq:note', { detail: { type: 'off', midi: midiNote, code: token } }));
-        }
-    }, {
-        key: 'releaseNotes',
-        value: function releaseNotes() {
-            var _this2 = this;
-
-            if (this._held) Array.from(this._held).forEach(function (_ref) {
-                var _ref2 = _slicedToArray(_ref, 2),
-                    code = _ref2[0],
-                    midi = _ref2[1];
-
-                return _this2.noteOff(midi, code);
-            });
-        }
-    }, {
-        key: 'setupTakesMenu',
-        value: function setupTakesMenu() {
-            this.takesMenu = document.getElementById('takesMenu');
-
-            this.takesMenu.addEventListener('change', this.takeSelected.bind(this));
-
-            var newTakeOption = document.createElement('option');
-            newTakeOption.innerHTML = 'New Take';
-            this.takesMenu.appendChild(newTakeOption);
-
-            for (var i = 0; i < this.sessionManager.eventLog.takes.length; i++) {
-                var takeOption = document.createElement('option');
-                takeOption.innerHTML = 'Take ' + (i + 1);
-                this.takesMenu.appendChild(takeOption);
-            }
-
-            this._updateAudioControls();
-        }
-
-        /**
-         * Update configuration changes to the URL and to the saved session.
-         * 
-         * @param  {string|array} option  Either a string for the name of the configuration
-         *                                parameter, or an array of strings if the parameter
-         *                                is part of a nested object
-         * @param  {*}            value   The new value to save for this parameter
-         */
-
-    }, {
-        key: 'logUpdatedOption',
-        value: function logUpdatedOption(option, value) {
-            if (this.state == 'recording') {
-                return; // ignore when recording
-            }
-
-            // We accept option names as strings for convenience, but then convert
-            // them to an array of one string, for consistency
-            if (typeof option === 'string') {
-                option = [option];
-            }
-
-            var target = this.options;for (var i = 0; i < option.length - 1; i++) {
-                target = target[option[i]];
-            }target[option[option.length - 1]] = value;
-            this.configManager.updateURLOption(option, value);
-            this.updateShare();
-
-            this.sessionManager.saveOption(option, value);
-        }
-    }, {
-        key: 'takeSelected',
-        value: function takeSelected() {
-            var takeNumber = this.takesMenu.selectedIndex - 1; // if takeNumber == -1, then we've got a New Take
-            var take = takeNumber >= 0 ? this.sessionManager.eventLog.takes[takeNumber] : this.sessionManager.currentTake;
-            var takeEvent = {
-                type: 'take',
-                start: 0,
-                end: take.end - take.start,
-                events: take.events
-            };
-
-            this.timing.clearEvents();
-            this.timing.currentTime = 0;
-            this.timing.duration = takeEvent.end;
-            this.timing.addEvents([takeEvent]);
-            this._updateAudioControls();
-        }
-    }, {
-        key: '_simulateAttack',
-        value: function _simulateAttack(noteEvent) {
-            //console.log('attack: ' + ' key: ' + noteEvent.data.keyCode + ' note: ' + noteEvent.data.midiNote);
-
-            var simulatedEvent = {
-                keyCode: noteEvent.data.keyCode,
-                metaKey: false,
-                location: noteEvent.data.keyCode == 16 ? noteEvent.data.midiNote : 0, // left/right shift key support
-                preventDefault: function preventDefault() {}
-            };
-
-            //this.aqKeyboard.typekey(simulatedEvent);
-        }
-    }, {
-        key: '_simulateRelease',
-        value: function _simulateRelease(noteEvent) {
-            //console.log('release: ' + ' key: ' + noteEvent.data.keyCode + ' note: ' + noteEvent.data.midiNote);
-
-            var simulatedEvent = {
-                keyCode: noteEvent.data.keyCode,
-                metaKey: false,
-                location: noteEvent.data.keyCode == 16 ? noteEvent.data.midiNote : 0, // left/right shift key support
-                preventDefault: function preventDefault() {}
-
-                //this.aqKeyboard.untype(simulatedEvent);
-            };
-        }
-    }, {
-        key: '_handleTakeStart',
-        value: function _handleTakeStart(takeEvent) {
-            console.log('take started');
-        }
-    }, {
-        key: '_handleTakeEnd',
-        value: function _handleTakeEnd(takeEvent) {
-            this.playButtonClicked();
-            this.takeSelected(); // ready to play again
-        }
-    }, {
-        key: 'handleProgress',
-        value: function handleProgress() {
-            this._updateAudioControls();
-
-            var percentDone = 100 * this.timing.currentTime / this.timing.duration;
-            //console.log('playing: ' + this.timing.currentTime);
-            //document.getElementById('progress').style['width'] = percentDone + '%';
-        }
-    }, {
-        key: '_updateAudioControls',
-        value: function _updateAudioControls() {
-            var timeLeftText = document.getElementById('timeLeft');
-            var timeLapsed = document.getElementById('timeLapsed');
-            var duration = this.timing.duration;
-            var currentTime = Math.round(this.timing.currentTime);
-            var remaining = Math.round(duration - currentTime);
-            var timeLeftSeconds = Math.floor(remaining % 60);
-            var timePassedSeconds = Math.floor(currentTime % 60);
-            var timeLeftMinutes = Math.floor(remaining / 60 % 60);
-            var timePassedMinutes = Math.floor(currentTime / 60 % 60);
-
-            timeLapsed.innerHTML = timePassedMinutes + ':' + (timePassedSeconds < 10 ? '0' : '') + timePassedSeconds + ' / ';
-            timeLeftText.innerHTML = timeLeftMinutes + ':' + (timeLeftSeconds < 10 ? '0' : '') + timeLeftSeconds;
-        }
-    }, {
-        key: 'flushNotes',
-        value: function flushNotes() {
-            for (var i in mySynth._activeVoices) {
-                if (mySynth._activeVoices[i]) {
-                    mySynth._activeVoices[i].triggerRelease();
-                }
-            }
-            this.currentTake.end = Tone.context.currentTime;
-        }
-    }, {
-        key: 'layout',
-        value: function layout() {
-            // TODO: Load this from an external file
-            var layout = void 0;
-            if (this.isMobile) {
-                layout = [['presetPicker'], ['video'], ['scalePicker', 'rootPicker'], ['keyboard'], ['soundPicker', 'noteCaps']];
-            } else {
-                layout = [['presetPicker'], ['video', 'score'], ['scalePicker', 'rootPicker'], ['volume', 'keyboard'], ['soundPicker', 'noteCaps']];
-            }
-
-            var namedNodes = {
-                keyboard: this.keyboard.keyboardContainer,
-                noteCaps: this.keyboard.noteCapToggle,
-                soundPicker: this.audioControls.soundPicker,
-                volume: this.audioControls.volumeControl,
-                scalePicker: this.scalePicker.container,
-                rootPicker: this.rootPicker.container,
-                video: this.video.container,
-                score: this.scoreImage.container,
-                presetPicker: this.presetPicker.container
-            };
-
-            var container = document.getElementById('main');
-
-            var _iteratorNormalCompletion = true;
-            var _didIteratorError = false;
-            var _iteratorError = undefined;
-
-            try {
-                for (var _iterator = layout[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
-                    var row = _step.value;
-
-                    var rowNode = document.createElement('div');
-                    rowNode.classList.add('row');
-                    container.appendChild(rowNode);
-
-                    var _iteratorNormalCompletion2 = true;
-                    var _didIteratorError2 = false;
-                    var _iteratorError2 = undefined;
-
-                    try {
-                        for (var _iterator2 = row[Symbol.iterator](), _step2; !(_iteratorNormalCompletion2 = (_step2 = _iterator2.next()).done); _iteratorNormalCompletion2 = true) {
-                            var nodeName = _step2.value;
-
-                            rowNode.appendChild(namedNodes[nodeName]);
-                        }
-                    } catch (err) {
-                        _didIteratorError2 = true;
-                        _iteratorError2 = err;
-                    } finally {
-                        try {
-                            if (!_iteratorNormalCompletion2 && _iterator2.return) {
-                                _iterator2.return();
-                            }
-                        } finally {
-                            if (_didIteratorError2) {
-                                throw _iteratorError2;
-                            }
-                        }
-                    }
-                }
-            } catch (err) {
-                _didIteratorError = true;
-                _iteratorError = err;
-            } finally {
-                try {
-                    if (!_iteratorNormalCompletion && _iterator.return) {
-                        _iterator.return();
-                    }
-                } finally {
-                    if (_didIteratorError) {
-                        throw _iteratorError;
-                    }
-                }
-            }
-        }
-    }, {
-        key: 'reconfigure',
-        value: function reconfigure() {
-            var _this3 = this;
-
-            var features = this.options.features;
-
-            // ROOT
-            this.rootPicker.root = this.options.midiRoot;
-
-            // SCALE
-            this.scalePicker.scale = this.options.scaleSlug;
-
-            // LAYOUT & LABELS
-            this.keyboard.mapping.layout = features.layout;
-            this.keyboard.labelMode = features.labelMode || (features.useNoteCaps ? 'western' : 'keys');
-
-            // SOUND
-            this.audioControls.switchSound(this.options.soundSlug, features.audioEngine);
-            this.audioControls.volume = this.options.volume;
-
-            // VIDEO
-            this.video.enabled = features.showVideo;
-            this.video.videoSlug = this.options.videoSlug;
-            this.video.showVideoURLControl = features.allControls;
-
-            // SCORE
-            if (features.showScore) {
-                this.scoreImage.scoreSrc = this.imageHost + this.options.scoreSlug + '-aqw.png';
-            }
-            this.scoreImage.toggleVisibility(features.showScore);
-
-            // Share the selected musical configuration, not just its sound/video.
-            ['midiRoot', 'scaleSlug', 'soundSlug', 'videoSlug', 'volume'].forEach(function (k) {
-                return _this3.logUpdatedOption(k, _this3.options[k]);
-            });
-            ['layout', 'useNoteCaps', 'labelMode'].forEach(function (k) {
-                return _this3.logUpdatedOption(['features', k], features[k]);
-            });
-
-            // FEATURE REGIONS
-            this.scalePicker.toggleVisibility(features.allControls && features.scaleControls);
-            this.rootPicker.toggleVisibility(features.allControls && features.scaleControls);
-            this.audioControls.toggleSoundPicker(features.allControls && features.showSounds);
-
-            this.keyboard.keyboardIsHidden = features.showKeyboard;
-
-            this.resize();
-            setTimeout(this.resize.bind(this), 500); // HACK: additional resize needed for some deployments (e.g. CloudFlare or MusedBox)
-        }
-    }, {
-        key: 'recordButtonClicked',
-        value: function recordButtonClicked(e) {
-            var recBtn = document.getElementById('recButtonImg');
-            var timeLapsed = document.getElementById('timeLapsed');
-            var timeLeftText = document.getElementById('timeLeft');
-
-            var recordClock;
-            var recordingStartTime;
-
-            if (this.state === 'recording') {
-                this.sessionManager.saveTake();
-                // end record clock
-                this.state = '';
-
-                var takeNumber = this.takesMenu.querySelectorAll('option').length; // assume first option is 'New Take', so add 1
-
-                console.log(takeNumber);
-
-                var option = document.createElement('option');
-                option.innerHTML = 'Take ' + takeNumber;
-                this.takesMenu.appendChild(option);
-
-                this.takesMenu.selectedIndex = takeNumber;
-                this.takeSelected();
-
-                recBtn.src = 'img/aqwertyon_ux_record.png';
-
-                // stop recording clock
-                window.cancelAnimationFrame(recordClock);
-                timeLapsed.innerHTML = '0:00 / ';
-            } else {
-
-                // start record clock here
-                var _updateRecordClock = function _updateRecordClock(t) {
-                    var recMillis = t - recordingStartTime > 0 ? t - recordingStartTime : 0;
-                    var clockVal = recMillis / 1000;
-                    var timePassedSeconds = Math.round(clockVal % 60);
-                    var timePassedMinutes = Math.round(clockVal / 60 % 60);
-                    timeLapsed.innerHTML = timePassedMinutes + ':' + (timePassedSeconds < 10 ? '0' : '') + timePassedSeconds + ' / ';
-
-                    if (Math.round(recMillis / 8) % 2) {
-                        timeLapsed.style.backgroundColor = 'rgba(255, 100, 100, 0.2)';
-                        timeLeftText.style.backgroundColor = 'rgba(255, 100, 100, 0.2)';
-                    } else {
-                        timeLapsed.style.backgroundColor = 'rgba(255, 200,200, 0.2)';
-                        timeLeftText.style.backgroundColor = 'rgba(255, 200, 200, 0.2)';
-                    }
-
-                    if (self.state === 'recording') {
-                        recordClock = window.requestAnimationFrame(_updateRecordClock);
-                    } else {
-                        // revet
-                        timeLapsed.innerHTML = '0:00 / ';
-                        timeLapsed.style.backgroundColor = '';
-                        timeLeftText.style.backgroundColor = '';
-                    }
-                };
-
-                this.sessionManager.startTake();
-                var self = this;
-
-                recordingStartTime = window.performance.now();
-                timeLeftText.innerHTML = '0:00';
-                recordClock = window.requestAnimationFrame(_updateRecordClock);
-
-                this.state = 'recording';
-                recBtn.src = 'img/aqwertyon_ux_record_red.png';
-            }
-        }
-    }, {
-        key: 'playButtonClicked',
-        value: function playButtonClicked() {
-            var playBtn = document.getElementById('playButtonImg');
-
-            if (this.state === 'playingTake') {
-                this.timing.pause();
-                //    stopVideo();
-                playBtn.src = 'img/aqwertyon_ux_play-.png';
-                this.state = '';
-            } else if (this.state === '') {
-                this.state = 'playingTake';
-                this.timing.play();
-                //    playVideo();
-                playBtn.src = 'img/aqwertyon_ux_play-green.png';
-            } else {
-                // ignore; doing something else (like recording)
-            }
-        }
-    }]);
-
-    return Aqwertyon;
-}(MusED.AppBase);
-
-module.exports = Aqwertyon;
-
-},{"./AudioControls.js":53,"./PresetPicker.js":54,"./ScalePicker.js":55,"./Score.js":56,"./Video.js":57,"./controller/Keyboard":64,"./controller/RootPicker":65,"./makemidi.js":68,"./sessionManager.js":70,"./timing.js":73,"mused-app-core":48,"tone":41}],60:[function(require,module,exports){
-'use strict';
-
-var Tone = require('tone');
-var SynthPresets = require('./synthPresets.js');
-
-var Sounds = function Sounds() {
-    this.synth = null;
-    this.reverb = null;
-    this.distortion = null;
-    this.chorus = null;
-    this.chorus2 = null;
-    this.delay = null;
-    this.delay2 = null;
-    this.initialVolume = 1.0;
-
-    // Presets are defined in lib/Tone.Preset.js
-    this.instruments = [{
-        "slug": "punch",
-        "name": "Punch"
-    },
-    // {
-    //     "slug": "radard",
-    //     "name": "Radard"
-    // },
-    {
-        "slug": "the-90",
-        "name": "The90"
-    }, {
-        "slug": "pad-space",
-        "name": "PadSpace"
-    }, {
-        "slug": "rain",
-        "name": "Rain"
-    },
-    // {
-    //     "slug": "pianoetta",
-    //     "name": "Pianoetta"
-    // },
-    {
-        "slug": "bass",
-        "name": "Bass"
-    }, {
-        "slug": "bessie",
-        "name": "Bessie"
-    },
-    //{
-    //    "slug": "brass-circuit",
-    //    "name": "BrassCircuit"
-    //},
-    {
-        "slug": "brass-slow",
-        "name": "BrassSlow"
-    },
-    // {
-    //     "slug": "dist-git",
-    //     "name": "DistGit"
-    // },
-    {
-        "slug": "trumpet",
-        "name": "Trumpet"
-    }, {
-        "slug": "koto",
-        "name": "Koto"
-    }, {
-        "slug": "steely",
-        "name": "Steely"
-    },
-    // {
-    //     "slug": "organic",
-    //     "name": "Organic"
-    // },
-    {
-        "slug": "organ",
-        "name": "Organ"
-    }];
-
-    this.setupTone();
-};
-
-Sounds.prototype = {
-    setInstrument: function setInstrument(synthSlug) {
-        if (this.synth) {
-            this.synth.dispose();
-        }
-
-        var mySynth = null;
-
-        // presets and correspond with either FMSynth, DuoSynth or MonoSynth
-        switch (synthSlug) {
-            case 'koto':
-            case 'trumpet':
-            case 'dist-git':
-                mySynth = new Tone.PolySynth(10, Tone.FMSynth);
-                break;
-
-            case 'steely':
-            case 'organ':
-            case 'organic':
-                mySynth = new Tone.PolySynth(10, Tone.DuoSynth);
-                break;
-
-            case 'punch':
-                mySynth = new Tone.PolySynth(10, Tone.DuoSynth);
-                mySynth.connect(this.distortion);
-                mySynth.connect(this.delay);
-                break;
-
-            case 'radard':
-                mySynth = new Tone.PolySynth(10, Tone.DuoSynth);
-                mySynth.connect(this.chorus);
-                mySynth.connect(this.delay2);
-                break;
-
-            case 'the-90':
-                mySynth = new Tone.PolySynth(10, Tone.DuoSynth);
-                break;
-
-            case 'pad-space':
-                mySynth = new Tone.PolySynth(10, Tone.DuoSynth);
-                mySynth.connect(this.chorus2);
-                break;
-
-            case 'rain':
-                mySynth = new Tone.PolySynth(10, Tone.DuoSynth);
-                break;
-
-            default:
-                console.log('setting monosynth');
-                mySynth = new Tone.PolySynth(10, Tone.MonoSynth);
-                break;
-        }
-
-        if (SynthPresets[synthSlug]) {
-            mySynth.set(SynthPresets[synthSlug]);
-        } else {
-            console.log('no preset with the name ' + synthSlug);
-        }
-        mySynth.connect(this.EQ);
-
-        this.synth = mySynth;
-        return synthSlug;
-    },
-
-    setMasterVolume: function setMasterVolume(vol) {
-        var db = Tone.Master.gainToDb(vol);
-        Tone.Master.volume.value = db;
-    },
-
-    noteOn: function noteOn(midiNote) {
-        this.synth.triggerAttack(Tone.Frequency(midiNote, 'midi').eval());
-    },
-
-    noteOff: function noteOff(midiNote) {
-        this.synth.triggerRelease(Tone.Frequency(midiNote, 'midi').eval());
-    },
-
-    setupTone: function setupTone() {
-        // put reverb on everything
-        var myReverb = new Tone.Freeverb();
-        //myReverb.setPreset('coolRoom'); // TODO: no longer supported in Tone 6 - needed?
-        myReverb.wet.value = .32;
-        myReverb.toMaster();
-
-        //set up Tone Synth
-        var mySynth = new Tone.PolySynth(10, Tone.MonoSynth);
-
-        this.EQ = new Tone.EQ3();
-        this.EQ.lowFrequency.value = 140;
-        this.EQ.highFrequency.value = 3200;
-        this.EQ.low.value = -12;
-        this.EQ.mid.value = -6;
-        this.EQ.high.value = 12;
-
-        // add pitchBend to effects chain
-        this.pitchBend = new Tone.PitchShift();
-        Tone.Master.chain(this.pitchBend);
-
-        this.EQ.toMaster();
-        // mySynth.toMaster();
-
-        //distortion E1
-        var myDistortion = new Tone.Distortion(0.2);
-        // myDistortion.oversample = '2x';
-
-        //delay E1
-        var myDelay = new Tone.FeedbackDelay("50n", 0.2);
-
-        //myDelay.connect(myDistortion);
-        myDelay.toMaster();
-        myDistortion.connect(this.EQ);
-
-        //Chorus E2
-        var myChorus = new Tone.Chorus(10, 5, 1);
-        myChorus.connect(this.EQ);
-
-        //delay E2
-        var myDelay2 = new Tone.FeedbackDelay("20n", 0.75);
-        myDelay2.connect(this.EQ);
-
-        //Chorus E4
-        var myChorus4 = new Tone.Chorus(0.9, 3, 0.9);
-        myChorus4.connect(this.EQ);
-
-        //Phaser E4
-        var myPhaser4 = new Tone.Phaser(0.1, 8, 10);
-        myPhaser4.connect(this.EQ);
-
-        //FilmScore Reverb
-        var longReverb = new Tone.JCReverb();
-        longReverb.roomSize.value = 0.48;
-        longReverb.wet.value = 0.39;
-        longReverb.toMaster();
-
-        //Attack Envelope
-        var ampEnv1 = new Tone.AmplitudeEnvelope({
-            "attack": 0.0001,
-            "decay": 0.2,
-            "sustain": 1.0,
-            "release": 0.8
-        });
-
-        ampEnv1.connect(this.EQ);
-
-        this.synth = mySynth;
-        this.reverb = myReverb;
-        this.distortion = myDistortion;
-        this.chorus = myChorus;
-        this.chorus2 = myChorus4;
-        this.delay = myDelay;
-        this.delay2 = myDelay2;
-        this.filmReverb = longReverb;
-    }
-};
-
-module.exports = Sounds;
-
-},{"./synthPresets.js":61,"tone":41}],61:[function(require,module,exports){
-"use strict";
-
-/**
- *  This module contains all of the synthPresets.
- *  Create JS objects and assign them to the proper
- *  slug at the bottom (module.exports = {slugs}).
- */
-
-var Koto = {
-  "portamento": 0,
-  "harmonicity": 3.01,
-  "modulationIndex": 12.7,
-  "carrier": {
-    "volume": -12,
-    "portamento": 0,
-    "oscillator": {
-      "type": "triangle"
-    },
-    "filter": {
-      "Q": 2,
-      "type": "lowpass",
-      "rolloff": -12
-    },
-    "envelope": {
-      "attack": 0.01,
-      "decay": 2,
-      "sustain": 0,
-      "release": 0.8
-    },
-    "filterEnvelope": {
-      "attack": 0.06,
-      "decay": 0.07,
-      "sustain": 0.35,
-      "release": 0.8,
-      "min": 20000,
-      "max": 20000
-    }
-  },
-  "modulator": {
-    "volume": -1,
-    "portamento": 0,
-    "oscillator": {
-      "type": "sine"
-    },
-    "filter": {
-      "Q": 0,
-      "type": "lowpass",
-      "rolloff": -12
-    },
-    "envelope": {
-      "attack": 0.02,
-      "decay": 2,
-      "sustain": 0,
-      "release": 0.8
-    },
-    "filterEnvelope": {
-      "attack": 0.03,
-      "decay": 0.25,
-      "sustain": 0.7,
-      "release": 1,
-      "min": 20000,
-      "max": 20000
-    }
-  }
-};
-
-var Trumpet = {
-  "portamento": 0,
-  "harmonicity": 1,
-  "modulationIndex": 4,
-  "carrier": {
-    "volume": -15,
-    "portamento": 0,
-    "oscillator": {
-      "type": "square"
-    },
-    "filter": {
-      "Q": 2,
-      "type": "lowpass",
-      "rolloff": -12
-    },
-    "envelope": {
-      "attack": 0.01,
-      "decay": 1,
-      "sustain": 0.7,
-      "release": 0.4
-    },
-    "filterEnvelope": {
-      "attack": 0.06,
-      "decay": 0.07,
-      "sustain": 0.35,
-      "release": 0.8,
-      "min": 3000,
-      "max": 6500
-    }
-  },
-  "modulator": {
-    "volume": -6,
-    "portamento": 0,
-    "oscillator": {
-      "type": "triangle"
-    },
-    "filter": {
-      "Q": 0,
-      "type": "lowpass",
-      "rolloff": -12
-    },
-    "envelope": {
-      "attack": 0.15,
-      "decay": 0.3,
-      "sustain": 1,
-      "release": 1.5
-    },
-    "filterEnvelope": {
-      "attack": 0.03,
-      "decay": 0.25,
-      "sustain": 0.7,
-      "release": 1,
-      "min": 20000,
-      "max": 20000
-    }
-  }
-};
-
-var DistGit = {
-  "portamento": 0,
-  "harmonicity": 1,
-  "modulationIndex": 10,
-  "carrier": {
-    "volume": 0,
-    "portamento": 0,
-    "oscillator": {
-      "type": "square"
-    },
-    "filter": {
-      "Q": 2,
-      "type": "lowpass",
-      "rolloff": -12
-    },
-    "envelope": {
-      "attack": 0.001,
-      "decay": 3.3,
-      "sustain": 0,
-      "release": 1.2
-    },
-    "filterEnvelope": {
-      "attack": 0.05,
-      "decay": 0.15,
-      "sustain": 1,
-      "release": 1.5,
-      "min": 400,
-      "max": 4000
-    }
-  },
-  "modulator": {
-    "volume": -3,
-    "portamento": 0,
-    "oscillator": {
-      "type": "sine"
-    },
-    "filter": {
-      "Q": 1,
-      "type": "lowpass",
-      "rolloff": -48
-    },
-    "envelope": {
-      "attack": 0.3,
-      "decay": 0.4,
-      "sustain": 1,
-      "release": 1.7
-    },
-    "filterEnvelope": {
-      "attack": 0.02,
-      "decay": 0.02,
-      "sustain": 0.1,
-      "release": 1.5,
-      "min": 200,
-      "max": 200
-    }
-  }
-};
-
-var Steely = {
-  "vibratoAmount": 0.0,
-  "vibratoRate": 5,
-  "vibratoDelay": 1,
-  "portamento": 0,
-  "harmonicity": 1.99,
-  "voice0": {
-    "volume": -12,
-    "portamento": 0,
-    "oscillator": {
-      "type": "square"
-    },
-    "filter": {
-      "Q": 12,
-      "type": "lowpass",
-      "rolloff": -12
-    },
-    "envelope": {
-      "attack": 0.04,
-      "decay": 1,
-      "sustain": 0.01,
-      "release": 0.4
-    },
-    "filterEnvelope": {
-      "attack": 0.01,
-      "decay": 0.01,
-      "sustain": 0.35,
-      "release": 1,
-      "min": 400,
-      "max": 12000
-    }
-  },
-  "voice1": {
-    "volume": -6,
-    "portamento": 0,
-    "oscillator": {
-      "type": "sine"
-    },
-    "filter": {
-      "Q": 12,
-      "type": "lowpass",
-      "rolloff": -12
-    },
-    "envelope": {
-      "attack": 0.25,
-      "decay": 4,
-      "sustain": 0,
-      "release": 0.8
-    },
-    "filterEnvelope": {
-      "attack": 0.03,
-      "decay": 0.25,
-      "sustain": 0.7,
-      "release": 1,
-      "min": 1000,
-      "max": 2500
-    }
-  }
-};
-
-var Organ = {
-  "vibratoAmount": 0.5,
-  "vibratoRate": 5,
-  "vibratoDelay": 0,
-  "portamento": 0.001,
-  "harmonicity": 3.005,
-  "filter": {
-    "Q": 0.4,
-    "type": "lowpass",
-    "rolloff": -12
-  },
-  "voice0": {
-    "volume": -7,
-    "portamento": 0.01,
-    "oscillator": {
-      "type": "sine"
-    },
-    "envelope": {
-      "attack": 0.005,
-      "decay": 0.25,
-      "sustain": 0.4,
-      "release": 1.2
-    },
-    "filterEnvelope": {
-      "attack": 0.005,
-      "decay": 0.5,
-      "sustain": 0.7,
-      "release": 2,
-      "min": 800,
-      "max": 2200
-    }
-  },
-  "voice1": {
-    "volume": -5,
-    "portamento": 0.01,
-    "oscillator": {
-      "type": "sine"
-    },
-    "envelope": {
-      "attack": 0.25,
-      "decay": 4,
-      "sustain": 0.1,
-      "release": 0.8
-    },
-    "filterEnvelope": {
-      "attack": 0.005,
-      "decay": 0.5,
-      "sustain": 0.7,
-      "release": 2,
-      "min": 900,
-      "max": 4200
-    }
-  }
-};
-
-var Organic = {
-  "vibratoAmount": 0.3,
-  "vibratoRate": 3.5,
-  "harmonicity": 1.5,
-  "voice0": {
-    "volume": -6,
-    "oscillator": {
-      "frequency": 0,
-      "type": "sine"
-    },
-    "filter": {
-      "type": "lowpass",
-      "rolloff": -12,
-      "Q": 2.8
-    },
-    "envelope": {
-      "attack": 0.0070,
-      "decay": 0,
-      "sustain": 1,
-      "release": 0.056682076
-    },
-    "filterEnvelope": {
-      "min": 219.80,
-      "max": 1049.54942,
-      "exponent": 2,
-      "attack": 0.00704,
-      "decay": 0.0278,
-      "sustain": 0.065,
-      "release": 0.0749
-    }
-  },
-  "voice1": {
-    "volume": -20,
-    "oscillator": {
-      "type": "sine"
-    },
-    "filter": {
-      "type": "highpass",
-      "rolloff": -12,
-      "Q": 4.55
-    },
-    "envelope": {
-      "attack": 0.011,
-      "decay": 0.016,
-      "sustain": 0.7464,
-      "release": 0.074
-    },
-    "filterEnvelope": {
-      "min": 298.20,
-      "max": 80.43,
-      "exponent": 2,
-      "attack": 0.0035,
-      "decay": 0.0060,
-      "sustain": 1,
-      "release": 0.108
-    }
-  },
-  "portamento": 0
-};
-
-var Punch = {
-  "vibratoAmount": 0.1,
-  "vibratoRate": 5,
-  "vibratoDelay": 1,
-  "portamento": 0,
-  "harmonicity": 1.005,
-  "voice0": {
-    "volume": -6,
-    "portamento": 0,
-    "oscillator": {
-      "type": "sine"
-    },
-    "filter": {
-      "Q": 2,
-      "type": "highpass",
-      "rolloff": -12
-    },
-    "envelope": {
-      "attack": 0.02,
-      "decay": 0.03,
-      "sustain": 0.2,
-      "release": 0.3
-    },
-    "filterEnvelope": {
-      "attack": 0.025,
-      "decay": 0.05,
-      "sustain": 0.002,
-      "release": 0.3,
-      "min": 40,
-      "max": 340
-    }
-  },
-  "voice1": {
-    "volume": -20,
-    "portamento": 0,
-    "oscillator": {
-      "type": "sawtooth"
-    },
-    "filter": {
-      "Q": 0.5,
-      "type": "bandpass",
-      "frequency": 60,
-      "rolloff": -12
-    },
-    "envelope": {
-      "attack": 0.02,
-      "decay": 0.3,
-      "sustain": 0.05,
-      "release": 0.8
-    },
-    "filterEnvelope": {
-      "attack": 0.025,
-      "decay": 0.5,
-      "sustain": 0.001,
-      "release": 0.03,
-      "min": 1240,
-      "max": 1500
-    }
-  }
-};
-
-var Radard = {
-  "vibratoAmount": 0.1,
-  "vibratoRate": 5,
-  "vibratoDelay": 1,
-  "portamento": 0,
-  "harmonicity": 1.005,
-  "voice0": {
-    "volume": 30,
-    "portamento": 0,
-    "oscillator": {
-      "type": "sine"
-    },
-    "filter": {
-      "Q": 1,
-      "type": "highpass",
-      "rolloff": -12
-    },
-    "envelope": {
-      "attack": 0.01,
-      "decay": 0.3,
-      "sustain": 0,
-      "release": 0.1
-    },
-    "filterEnvelope": {
-      "attack": 1,
-      "decay": 0.05,
-      "sustain": 0.001,
-      "release": 0.1,
-      "min": 100,
-      "max": 10000
-    }
-  },
-  "voice1": {
-    "volume": -100,
-    "portamento": 0,
-    "oscillator": {
-      "type": "sawtooth"
-    },
-    "filter": {
-      "Q": 2,
-      "type": "lowpass",
-      "rolloff": -12
-    },
-    "envelope": {
-      "attack": 0.01,
-      "decay": 0.3,
-      "sustain": 0,
-      "release": 0.1
-    },
-    "filterEnvelope": {
-      "attack": 1,
-      "decay": 1,
-      "sustain": 0.001,
-      "release": 1,
-      "min": 100,
-      "max": 10000
-    }
-  }
-};
-
-var The90s = {
-  "vibratoAmount": 0.1,
-  "vibratoRate": 5,
-  "vibratoDelay": 1,
-  "portamento": 0,
-  "harmonicity": 1.005,
-  "voice0": {
-    "volume": -20,
-    "portamento": 0,
-    "oscillator": {
-      "type": "sine"
-    },
-    "filter": {
-      "Q": 30,
-      "type": "highpass",
-      "rolloff": -12
-    },
-    "envelope": {
-      "attack": 0.10,
-      "decay": 0.3,
-      "sustain": 0,
-      "release": 0.1
-    },
-    "filterEnvelope": {
-      "attack": 0.2,
-      "decay": 0.05,
-      "sustain": 0.01,
-      "release": 0.1,
-      "min": 700,
-      "max": 10000
-    }
-  },
-  "voice1": {
-    "volume": -6,
-    "portamento": 1,
-    "oscillator": {
-      "type": "sawtooth"
-    },
-    "filter": {
-      "Q": 7,
-      "type": "lowpass",
-      "rolloff": -12
-    },
-    "envelope": {
-      "attack": 0.01,
-      "decay": 0.3,
-      "sustain": 0,
-      "release": 0.1
-    },
-    "filterEnvelope": {
-      "attack": 0.3,
-      "decay": 1,
-      "sustain": 0.001,
-      "release": 1,
-      "min": 100,
-      "max": 10000
-    }
-  }
-};
-
-var PadSpace = {
-  "vibratoAmount": 0.1,
-  "vibratoRate": 5,
-  "vibratoDelay": 0,
-  "portamento": 0.001,
-  "harmonicity": 3.005,
-  "filter": {
-    "Q": 0.4,
-    "type": "lowpass",
-    "rolloff": -12
-  },
-  "voice0": {
-    "volume": 8,
-    "portamento": 0.01,
-    "oscillator": {
-      "type": "triangle"
-    },
-    "filter": {
-      "Q": 0.8,
-      "type": "bandpass",
-      "frequency": 600,
-      "rolloff": -12
-    },
-    "envelope": {
-      "attack": 9,
-      "decay": 0.1,
-      "sustain": 0.9,
-      "release": 2
-    },
-    "filterEnvelope": {
-      "attack": 0.01,
-      "decay": 0.01,
-      "sustain": 0.01,
-      "release": 1,
-      "min": 800,
-      "max": 2200
-    }
-  },
-  "voice1": {
-    "volume": 8,
-    "portamento": 0.01,
-    "oscillator": {
-      "type": "triangle"
-    },
-    "filter": {
-      "Q": 1,
-      "type": "lowpass",
-      "frequency": 7000,
-      "rolloff": -12
-    },
-    "envelope": {
-      "attack": 6,
-      "decay": 4,
-      "sustain": 0.1,
-      "release": 0.8
-    },
-    "filterEnvelope": {
-      "attack": 0.005,
-      "decay": 0.5,
-      "sustain": 0.7,
-      "release": 2,
-      "min": 900,
-      "max": 4200
-    }
-  }
-};
-
-var Rain = {
-  "vibratoAmount": 0.01,
-  "vibratoRate": 1.5,
-  "vibratoDelay": 0.02,
-  "portamento": 0.001,
-  "harmonicity": 3.1,
-  "filter": {
-    "Q": 1.4,
-    "type": "lowpass",
-    "rolloff": -12
-  },
-  "voice0": {
-    "volume": 15,
-    "portamento": 0.01,
-    "oscillator": {
-      "type": "sine"
-    },
-    "filter": {
-      "Q": 0.8,
-      "type": "bandpass",
-      "frequency": 600,
-      "rolloff": -12
-    },
-    "envelope": {
-      "attack": 0.4,
-      "decay": 0.2,
-      "sustain": 0.1,
-      "release": 1.2
-    },
-    "filterEnvelope": {
-      "attack": 0.01,
-      "decay": 0.01,
-      "sustain": 0.01,
-      "release": 1,
-      "min": 3000,
-      "max": 5200
-    }
-  },
-  "voice1": {
-    "volume": 0,
-    "portamento": 2.1,
-    "oscillator": {
-      "type": "sine"
-    },
-    "filter": {
-      "Q": 10,
-      "type": "lowpass",
-      "frequency": 7000,
-      "rolloff": -12
-    },
-    "envelope": {
-      "attack": 0.5,
-      "decay": 0.2,
-      "sustain": 0.1,
-      "release": 1.2
-    },
-    "filterEnvelope": {
-      "attack": 0.1,
-      "decay": 0.5,
-      "sustain": 0.7,
-      "release": 0.1,
-      "min": 2200,
-      "max": 6000
-    }
-  }
-};
-
-var Bass = {
-  "portamento": 0,
-  "oscillator": {
-    "type": "sine",
-    "volume": 3
-  },
-  "filter": {
-    "Q": 1,
-    "type": "lowpass",
-    "rolloff": -24
-  },
-  "envelope": {
-    "attack": 0.01,
-    "decay": 0.06,
-    "sustain": 0.4,
-    "release": 1
-  },
-  "filterEnvelope": {
-    "attack": 0.01,
-    "decay": 0.25,
-    "sustain": 0.6,
-    "release": 1.5,
-    "min": 60,
-    "max": 720
-  }
-};
-
-var Bessie = {
-  "portamento": 0.00,
-  "oscillator": {
-    "type": "sawtooth"
-  },
-  "filter": {
-    "Q": 3,
-    "type": "lowpass",
-    "rolloff": -24
-  },
-  "envelope": {
-    "attack": 0.01,
-    "decay": 0.03,
-    "sustain": 0.2,
-    "release": 0.8
-  },
-  "filterEnvelope": {
-    "attack": 0.045,
-    "decay": 0.7,
-    "sustain": 0.21,
-    "release": 0.5,
-    "min": 1245,
-    "max": 2250
-  }
-};
-
-var BrassSlow = {
-  "portamento": 0.1,
-  "oscillator": {
-    "type": "sawtooth"
-  },
-  "filter": {
-    "Q": 0.8,
-    "type": "lowpass",
-    "rolloff": -24
-  },
-  "envelope": {
-    "attack": 1.8,
-    "decay": 0.2,
-    "sustain": 0.01,
-    "release": 0.5
-  },
-  "filterEnvelope": {
-    "attack": 0.8,
-    "decay": 0.3,
-    "sustain": 0.8,
-    "release": 1.5,
-    "min": 1000,
-    "max": 3500
-  }
-};
-
-module.exports = {
-  'koto': Koto,
-  'trumpet': Trumpet,
-  'dist-git': DistGit,
-  'steely': Steely,
-  'organ': Organ,
-  'organic': Organic,
-  'punch': Punch,
-  'radard': Radard,
-  'the-90': The90s,
-  'pad-space': PadSpace,
-  'rain': Rain,
-  'bass': Bass,
-  'bessie': Bessie,
-  'brass-slow': BrassSlow
-};
-
-},{}],62:[function(require,module,exports){
-'use strict';
-
-var Tone = require('tone');
-var Soundfont = require('soundfont-player');
-var instrumentNames = require('soundfont-player/names/musyngkite.json');
-
-var Sounds = function Sounds() {
-    this._currInstrument = null;
-
-    this._volume = 0.5;
-
-    // Factor by which to multiply the gain
-    this._gainBoost = 6;
-
-    this.instruments = [];
-
-    this.defaultInstrument = 'flute';
-
-    this._loadedInstruments = {};
-    this._activeNotes = {};
-
-    var _iteratorNormalCompletion = true;
-    var _didIteratorError = false;
-    var _iteratorError = undefined;
-
-    try {
-        for (var _iterator = instrumentNames[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
-            var instrumentName = _step.value;
-
-            this.instruments.push({
-                slug: instrumentName,
-                name: instrumentName.replace(new RegExp('_', 'g'), ' ')
-            });
-
-            this._loadedInstruments[instrumentName] = null;
-        }
-    } catch (err) {
-        _didIteratorError = true;
-        _iteratorError = err;
-    } finally {
-        try {
-            if (!_iteratorNormalCompletion && _iterator.return) {
-                _iterator.return();
-            }
-        } finally {
-            if (_didIteratorError) {
-                throw _iteratorError;
-            }
-        }
-    }
-};
-
-Sounds.prototype = {
-    // for box build (NODE_LOCAL) use custom host path, otherwise use soundfont-player's default. TODO: our own cloud-based copy instead?
-    soundfontHost: 'false' == 'true' ? 'https://s3.amazonaws.com/musedlab-aqwertyon/' + 'soundfonts/' : 'https://gleitz.github.io/midi-js-soundfonts/',
-
-    // copy of soundfont-player's default nameToUrl using our build-specific host. TODO: support other sources as well?
-    nameToUrl: function nameToUrl(name, sf, format) {
-        format = format === 'ogg' ? format : 'mp3';
-        sf = sf === 'FluidR3_GM' ? sf : 'MusyngKite';
-
-        var url = Sounds.prototype.soundfontHost + sf + '/' + name + '-' + format + '.js';
-
-        return url;
-    },
-
-    setInstrument: function setInstrument(instrumentSlug) {
-        // Check to see if the instrument slug is even valid
-        if (this._loadedInstruments[instrumentSlug] === undefined) {
-            // If not, choose a default instead
-            return this.setInstrument(this.defaultInstrument);
-        }
-
-        this._requestedInstrument = instrumentSlug;
-        document.dispatchEvent(new CustomEvent('aq:sound', { detail: 'Loading ' + instrumentSlug.replace(/_/g, ' ') + '…' }));
-        if (this._loadedInstruments[instrumentSlug] === null) {
-            Soundfont.instrument(Tone.context, instrumentSlug, { soundfont: 'MusyngKite', nameToUrl: this.nameToUrl }).then(function (instrument) {
-                this._loadedInstruments[instrumentSlug] = instrument;
-                if (this._requestedInstrument === instrumentSlug) this._setCurrInstrument(instrumentSlug);
-            }.bind(this), function (error) {
-                if (this._requestedInstrument === instrumentSlug) document.dispatchEvent(new CustomEvent('aq:sound', { detail: 'Sound could not load. Check your connection or choose another sound.' }));
-            });
-        } else {
-            this._setCurrInstrument(instrumentSlug);
-        }
-
-        return instrumentSlug;
-    },
-
-    _setCurrInstrument: function _setCurrInstrument(instrumentSlug) {
-        var _this = this;
-
-        Object.keys(this._activeNotes).forEach(function (n) {
-            return _this.noteOff(n);
-        });
-        this._currInstrument = this._loadedInstruments[instrumentSlug];
-        this._currInstrument.out.gain.value = this._volume * this._gainBoost;
-        document.dispatchEvent(new CustomEvent('aq:sound', { detail: instrumentSlug.replace(/_/g, ' ') + ' ready' }));
-    },
-
-    setMasterVolume: function setMasterVolume(vol) {
-        this._volume = vol;
-
-        if (this._currInstrument) {
-            this._currInstrument.out.gain.value = this._volume * this._gainBoost;
-        }
-    },
-
-    createBackingInstrument: function createBackingInstrument() {
-        var _this2 = this;
-
-        var name = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 'acoustic_grand_piano';
-
-        this._backingPromises = this._backingPromises || {};
-        if (!this._backingPromises[name]) this._backingPromises[name] = Soundfont.instrument(Tone.context, name, { soundfont: 'MusyngKite', nameToUrl: this.nameToUrl }).then(function (instrument) {
-            instrument.out.gain.value = 1;return instrument;
-        }).catch(function (error) {
-            delete _this2._backingPromises[name];throw error;
-        });
-        return this._backingPromises[name];
-    },
-
-    noteOn: function noteOn(midiNote) {
-        // Don't play any notes if we haven't loaded any instruments yet
-        if (this._currInstrument === null) {
-            return;
-        }
-
-        if (midiNote in this._activeNotes) {
-            this.noteOff(midiNote);
-        }
-
-        this._activeNotes[midiNote] = this._currInstrument.play(midiNote);
-    },
-
-    noteOff: function noteOff(midiNote) {
-        if (midiNote in this._activeNotes) {
-            this._activeNotes[midiNote].stop();
-            delete this._activeNotes[midiNote];
-        }
-    }
-};
-
-module.exports = Sounds;
-
-},{"soundfont-player":38,"soundfont-player/names/musyngkite.json":40,"tone":41}],63:[function(require,module,exports){
-"use strict";
-
-// Accept both historical preset schemas without mutating their source records.
-function migrateConfig(version, input) {
-  var o = JSON.parse(JSON.stringify(input || {}));
-  o.features = o.features || {};
-  if (o.audio) {
-    o.volume = o.audio.volume;o.soundSlug = o.audio.soundSlug;o.features.audioEngine = o.audio.soundSet;delete o.audio;
-  }
-  if (o.video) {
-    o.videoSlug = o.video.videoSlug;o.features.showVideo = o.video.showVideo !== false;delete o.video;
-  }
-  return o;
-}
-module.exports = migrateConfig;
-
-},{}],64:[function(require,module,exports){
-'use strict';
-
-var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
-
-var _get = function get(object, property, receiver) { if (object === null) object = Function.prototype; var desc = Object.getOwnPropertyDescriptor(object, property); if (desc === undefined) { var parent = Object.getPrototypeOf(object); if (parent === null) { return undefined; } else { return get(parent, property, receiver); } } else if ("value" in desc) { return desc.value; } else { var getter = desc.get; if (getter === undefined) { return undefined; } return getter.call(receiver); } };
-
-function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
-
-function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
-
-function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
-
-var Util = require('mused-app-core/js/Util');
-var KeyMapper = require('./keyMapper');
-var ButtonGrid = require('mused-ui/widget/button-grid');
-
-var InstrumentGrid = function (_ButtonGrid) {
-    _inherits(InstrumentGrid, _ButtonGrid);
-
-    function InstrumentGrid() {
-        _classCallCheck(this, InstrumentGrid);
-
-        return _possibleConstructorReturn(this, (InstrumentGrid.__proto__ || Object.getPrototypeOf(InstrumentGrid)).apply(this, arguments));
-    }
-
-    _createClass(InstrumentGrid, [{
-        key: '_keyPressed',
-        value: function _keyPressed(event) {
-            var region = this.domNode.parentElement;
-            if (!region || !region.contains(document.activeElement) || event.key === 'Tab' || event.isComposing || event.target.isContentEditable || event.target.closest && event.target.closest('input,textarea,select,button,a,summary,[role="button"]')) return;
-            _get(InstrumentGrid.prototype.__proto__ || Object.getPrototypeOf(InstrumentGrid.prototype), '_keyPressed', this).call(this, event);
-        }
-    }, {
-        key: 'deactivate',
-        value: function deactivate() {
-            _get(InstrumentGrid.prototype.__proto__ || Object.getPrototypeOf(InstrumentGrid.prototype), 'deactivate', this).call(this);this._overlay.classList.add('hidden');
-        }
-    }]);
-
-    return InstrumentGrid;
-}(ButtonGrid);
-
-/**
-The Keyboard wraps around the keyboard component and controls the way that its
-keys are mapped, as well as cleaning up its output into a well-formed stream of
-midi note on and off events.
-*/
-
-
-var Keyboard = function Keyboard(parent) {
-    // Main references to other classes
-    this._parent = parent;
-    this.buttons = new InstrumentGrid();
-    this.mapping = new KeyMapper(this);
-
-    // Publicly-available properties
-    this._useCustomLabels = false;
-
-    // Publicly-available DOM nodes (these are available once init() is called)
-    this.keyboardContainer;
-    this.noteCapToggle;
-
-    // Private DOM nodes
-    this._noteCapToggleButton;
-
-    // Count of how many times different buttons have been attacked (without yet
-    // being released)
-    this._buttonCounts = [];
-
-    this._keymapURL = this._parent.isMobile ? 'data/keymap_mobile.json' : 'data/keymap.json';
-    this._keyTemplate;
-};
-
-Keyboard.prototype = {
-    init: function init() {
-        var _this2 = this;
-
-        // Set up the keyboard container
-        this.keyboardContainer = document.createElement('div');
-        this.keyboardContainer.id = 'keyboardContainer';
-        this.keyboardContainer.tabIndex = 0;
-        this.keyboardContainer.setAttribute('role', 'group');
-        this.keyboardContainer.setAttribute('aria-label', 'Musical keyboard');
-        this.keyboardContainer.setAttribute('aria-description', 'Click or tap a key to play. When this keyboard has focus, use the letter keys to play. Tab moves to the next control.');
-        this.buttons.domNode.tabIndex = -1;
-        this.buttons._overlay.remove();
-        this.keyboardContainer.appendChild(this.buttons.domNode);
-        // Pointer capture supports independent fingers and releases on cancellation.
-        var grid = this.buttons,
-            heldPointers = new Map(),
-            node = grid.domNode;
-        node.style.touchAction = 'none';
-        ['mousedown', 'touchstart', 'touchmove', 'touchend'].forEach(function (type) {
-            return node.addEventListener(type, function (e) {
-                e.preventDefault();e.stopImmediatePropagation();
-            }, { capture: true, passive: false });
-        });
-        var end = function end(e) {
-            var b = heldPointers.get(e.pointerId);if (b) b.release('pointer-' + e.pointerId);heldPointers.delete(e.pointerId);
-        };
-        node.addEventListener('pointerdown', function (e) {
-            if (e.button !== 0) return;
-            // A pointer gesture must also dismiss the focus/mobile overlay.
-            // Preventing the compatibility mousedown means it cannot do this for us.
-            _this2.keyboardContainer.focus({ preventScroll: true });
-            grid.activate();
-            var hit = document.elementFromPoint(e.clientX, e.clientY);
-            var target = hit && hit.closest('.mused-button');
-            var b = target && node.contains(target) && grid._buttonsById[target.id];
-            if (!b) return;e.preventDefault();node.setPointerCapture(e.pointerId);b.attack('pointer-' + e.pointerId);heldPointers.set(e.pointerId, b);
-        });
-        node.addEventListener('pointermove', function (e) {
-            if (!heldPointers.has(e.pointerId)) return;
-            var target = document.elementFromPoint(e.clientX, e.clientY);var el = target && target.closest('.mused-button');var b = el && node.contains(el) && grid._buttonsById[el.id];
-            if (b && b !== heldPointers.get(e.pointerId)) {
-                end(e);b.attack('pointer-' + e.pointerId);heldPointers.set(e.pointerId, b);
-            }
-        });
-        ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function (type) {
-            return node.addEventListener(type, end);
-        });
-        this.releaseAll = function () {
-            heldPointers.forEach(function (b, id) {
-                return b.release('pointer-' + id);
-            });heldPointers.clear();grid.deactivate();_this2._parent.releaseNotes();
-        };
-        this.keyboardContainer.addEventListener('focusin', function () {
-            return grid.activate();
-        });
-        this.keyboardContainer.addEventListener('focusout', function (e) {
-            if (!_this2.keyboardContainer.contains(e.relatedTarget)) _this2.releaseAll();
-        });
-        window.addEventListener('blur', function () {
-            return _this2.releaseAll();
-        });
-        window.addEventListener('focus', function () {
-            if (_this2.keyboardContainer.contains(document.activeElement)) grid.activate();
-        });
-        document.addEventListener('visibilitychange', function () {
-            if (document.hidden) _this2.releaseAll();else if (_this2.keyboardContainer.contains(document.activeElement)) grid.activate();
-        });
-        window.addEventListener('pagehide', function () {
-            return _this2.releaseAll();
-        });
-
-        // Set up the note cap button
-        this.noteCapToggle = document.createElement('div');
-        this.noteCapToggle.classList.add('optionMenu');
-
-        var label = document.createElement('span');label.textContent = 'Key labels';label.id = 'keyboard-labels-heading';
-        this.noteCapToggle.appendChild(label);
-        this._labelSelect = document.createElement('div');this._labelSelect.id = 'keyboard-labels';this._labelSelect.setAttribute('role', 'group');this._labelSelect.setAttribute('aria-labelledby', 'keyboard-labels-heading');this._labelSelect.title = 'Jianpu: 1 is the selected root; dots above or below mark higher or lower octaves.';
-        this._labelSelect.innerHTML = '<button type="button" data-label="keys" aria-pressed="false">Keys</button><button type="button" data-label="western" aria-pressed="false">Notes</button><button type="button" data-label="jianpu" aria-pressed="false">Jianpu</button>';
-        this.noteCapToggle.appendChild(this._labelSelect);
-        var pointerLabelChoice = false;
-        this._labelSelect.addEventListener('pointerdown', function (e) {
-            pointerLabelChoice = e.button === 0;
-        });
-        this._labelSelect.addEventListener('keydown', function () {
-            pointerLabelChoice = false;
-        });
-        this._labelSelect.addEventListener('pointercancel', function () {
-            pointerLabelChoice = false;
-        });
-        this._labelSelect.addEventListener('click', function (e) {
-            var button = e.target.closest('button[data-label]');if (!button) return;
-            var returnToPlaying = pointerLabelChoice || e.detail > 0;pointerLabelChoice = false;
-            _this2.releaseAll();_this2.labelMode = button.dataset.label;
-            _this2._parent.logUpdatedOption(['features', 'labelMode'], _this2.labelMode);
-            if (returnToPlaying) {
-                _this2.keyboardContainer.focus({ preventScroll: true });grid.activate();
-            }
-        });
-
-        // Load Key Map
-        var self = this;
-        var keymapPromise = new Promise(function (resolve, reject) {
-            Util.get(self._keymapURL).then(JSON.parse).then(function (data) {
-                self._keyTemplate = data;
-                self.buttons.applyTemplate(data, true);
-
-                resolve();
-            });
-        });
-
-        // Add listeners for the two types of button events we expect
-        this.buttons.addListener('midi', this._keyAttack.bind(this), this._keyRelease.bind(this));
-        this.buttons.addListener('transpose', this._transposeOn.bind(this), this._transposeOff.bind(this));
-
-        // Return a promise
-        return keymapPromise;
-    },
-
-    /**
-     * [useCustomLabels description]
-     * @type {boolean}
-     */
-    get useCustomLabels() {
-        return this._useCustomLabels;
-    },
-
-    set useCustomLabels(value) {
-        this.labelMode = value ? 'western' : 'keys';
-    },
-    get labelMode() {
-        return this._labelMode || 'keys';
-    },
-    set labelMode(value) {
-        var _this3 = this;
-
-        this._labelMode = ['keys', 'western', 'jianpu'].includes(value) ? value : 'keys';
-        this._useCustomLabels = this._labelMode !== 'keys';
-        if (this._labelSelect) {
-            this._labelSelect.value = this._labelMode;this._labelSelect.querySelectorAll('button').forEach(function (b) {
-                return b.setAttribute('aria-pressed', String(b.dataset.label === _this3._labelMode));
-            });
-        }
-        this.mapping.updateNoteLabels();
-    },
-
-    /**
-     * Determines whether or not the keyboard HTML is visible (independent of
-     * whether or not it has been added to the document).
-     * 
-     * @type {boolean}
-     */
-    get keyboardIsHidden() {
-        return this.keyboardContainer.classList.contains('hidden');
-    },
-
-    set keyboardIsHidden(value) {
-        this.keyboardContainer.classList.toggle('hidden', !value);
-    },
-
-    /**
-     * Determines whether or not the button for turning on and off the note caps
-     * is visible.
-     * 
-     * @type {boolean}
-     */
-    get noteCapToggleIsHidden() {
-        return this.noteCapToggle.classList.contains('hidden');
-    },
-
-    set noteCapToggleIsHidden(value) {
-        this.noteCapToggle.classList.toggle('hidden', !value);
-    },
-
-    _keyAttack: function _keyAttack(value, buttonName) {
-        this._buttonCounts[value] = this._buttonCounts[value] || 0;
-
-        this._parent.noteOn(value, buttonName);
-        this._buttonCounts[value] += 1;
-    },
-
-    _keyRelease: function _keyRelease(value, buttonName) {
-        this._buttonCounts[value] -= 1;
-        this._parent.noteOff(value, buttonName);
-    },
-
-    _transposeOn: function _transposeOn(value, buttonName) {
-        this._adjustTranspose(value);
-    },
-
-    _transposeOff: function _transposeOff(value, buttonName) {
-        this._adjustTranspose(-value);
-    },
-
-    _adjustTranspose: function _adjustTranspose(change) {
-        this.mapping.transposition = this.mapping.transposition + change;
-        this._parent.sessionManager.logEvent('transpose', this.mapping.transposition);
-
-        // Updating eventData already releases and retriggers held buttons.
-    }
-};
-
-module.exports = Keyboard;
-
-},{"./keyMapper":66,"mused-app-core/js/Util":45,"mused-ui/widget/button-grid":49}],65:[function(require,module,exports){
-'use strict';
-
-var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
-
-function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
-
-var Theory = require('../theory-modern');
-
-var RootPicker = function () {
-  function RootPicker(parent) {
-    _classCallCheck(this, RootPicker);
-
-    this._parent = parent;this.keyMapper = parent.keyboard.mapping;this._root = 66;
-  }
-
-  _createClass(RootPicker, [{
-    key: 'init',
-    value: function init() {
-      var _this = this;
-
-      this.pickerContainer = document.createElement('div');this.pickerContainer.id = 'root-picker-container';
-      var control = function control(name, id) {
-        var wrap = document.createElement('div');wrap.className = 'optionMenu';var label = document.createElement('label');label.textContent = name;label.htmlFor = id;var select = document.createElement('select');select.id = id;wrap.append(label, select);_this.pickerContainer.append(wrap);return select;
-      };
-      this.rootMenu = control('Root', 'root-note-menu');this.octaveMenu = control('Octave', 'root-octave-menu');
-      Theory.roots.forEach(function (n, i) {
-        var o = document.createElement('option');o.value = i;o.textContent = Theory.pretty(n);_this.rootMenu.append(o);
-      });
-      for (var i = -1; i <= 9; i++) {
-        var o = document.createElement('option');o.value = i;o.textContent = i;this.octaveMenu.append(o);
-      }
-      var pointer = false;[this.rootMenu, this.octaveMenu].forEach(function (s) {
-        s.addEventListener('pointerdown', function () {
-          pointer = true;
-        });s.addEventListener('keydown', function () {
-          pointer = false;
-        });s.addEventListener('change', function () {
-          var value = (Number(_this.octaveMenu.value) + 1) * 12 + Number(_this.rootMenu.value);if (value > 127) {
-            _this.root = _this._root;return;
-          }
-          // Restore notebook's temporary settings before applying the selected root.
-          if (window.aqNotebook) window.aqNotebook.stop();_this._parent.releaseNotes();_this.root = value;_this._parent.logUpdatedOption('midiRoot', value);_this._parent.sessionManager.logEvent('root', value);
-          if (pointer) {
-            _this._parent.keyboard.keyboardContainer.focus({ preventScroll: true });_this._parent.keyboard.buttons.activate();
-          }pointer = false;
-        });
-      });this.root = this._root;
-    }
-  }, {
-    key: 'toggleVisibility',
-    value: function toggleVisibility(show) {
-      this.pickerContainer.classList.toggle('hidden', !show);
-    }
-  }, {
-    key: 'container',
-    get: function get() {
-      return this.pickerContainer;
-    }
-  }, {
-    key: 'root',
-    get: function get() {
-      return this._root;
-    },
-    set: function set(value) {
-      if (!Number.isInteger(value) || value < 0 || value > 127) return;this._root = value;this.keyMapper.root = value;if (this.rootMenu) {
-        this.rootMenu.value = String(value % 12);this.octaveMenu.value = String(Math.floor(value / 12) - 1);
-      }
-    }
-  }]);
-
-  return RootPicker;
-}();
-
-module.exports = RootPicker;
-
-},{"../theory-modern":71}],66:[function(require,module,exports){
-'use strict';
-
-var Theory = require('./theory.js');
-var ModernTheory = require('../theory-modern');
-
-/**
- *  KeyMapper maintains a "key map": a (2D) array of interface elements (such as keys on a keyboard or any button grid).
- *  The keys contain everything needed by a renderer or player.
- * @param options
- * @constructor
- */
-var KeyMapper = function KeyMapper(parent) {
-    // Public mapping properties
-    this._root = 48; // C3
-    this._transposition = 0;
-    this._pitchSet = Theory.scaleGroups[0].pitchSets[0];
-    this._layout = [1, 3, 5, 8];
-
-    this._parent = parent;
-};
-
-KeyMapper.prototype = {
-    _parseLayoutString: function _parseLayoutString(layoutString) {
-        var values = undefined;
-
-        if (layoutString) {
-            values = layoutString.split('-');
-
-            if (values.length == this._layout.length) {
-                for (var i = 0; i < values.length; i++) {
-                    var value = null;
-
-                    if (values[i] !== 'x') {
-                        // lower-case 'x' signals exclude
-                        value = parseInt(values[i]);
-
-                        if (isNaN(value)) {
-                            values = undefined; // invalid; bail
-                            break;
-                        }
-                    }
-
-                    values[i] = value;
-                }
-            }
-        }
-
-        return values;
-    },
-
-    updateNoteAssignments: function updateNoteAssignments() {
-        for (var i = 0; i < this._layout.length; i++) {
-            if (this._layout[i]) {
-                var rowInterval = this._layout[i] - 1;
-                var octave = Math.floor(rowInterval / 7);
-                rowInterval = rowInterval % 7;
-
-                switch (rowInterval) {
-                    case 0:
-                        var intervals = this._pitchSet.roots;
-                        break;
-                    case 2:
-                        intervals = this._pitchSet.thirds;
-                        break;
-                    case 4:
-                        intervals = this._pitchSet.fifths;
-                        break;
-                    case 6:
-                        intervals = this._pitchSet.sevenths;
-                        break;
-                }
-            }
-
-            for (var j = 0; j <= 12; ++j) {
-                var button = this._parent.buttons.getButtonByName(j + '-' + i);
-
-                if (button) {
-                    if (this._layout[i]) {
-                        var degreeOffset = j % intervals.length;
-                        var degree = intervals[degreeOffset];
-
-                        var noteOctave = octave + Math.floor(j / intervals.length);
-
-                        var note = this._root + this._transposition + degree + 12 * noteOctave;
-                        button.eventData = note;
-                        button.disabled = false;
-                    } else {
-                        button.disabled = true;
-                    }
-                }
-            }
-        }
-
-        this.updateNoteLabels();
-    },
-
-    updateNoteLabels: function updateNoteLabels() {
-        var _this = this;
-
-        var mode = this._parent.labelMode;
-        var definitions = {};(this._parent._keyTemplate || []).forEach(function (row) {
-            return row.forEach(function (k) {
-                if (k.name) definitions[k.name] = k.label;
-            });
-        });
-        Object.keys(this._parent.buttons._buttonsByName).forEach(function (name) {
-            var b = _this._parent.buttons._buttonsByName[name];
-            if (b.eventType !== 'midi' || !Number.isInteger(b.eventData)) return;
-            var spelling = ModernTheory.spell(b.eventData, _this._root, _this._parent._parent.scalePicker.scale);
-            var note = ModernTheory.pretty(spelling.replace(/-?\d+$/, '')),
-                key = definitions[name] || '';
-            b._domNode.dataset.pitchName = spelling;
-            if (mode === 'jianpu') {
-                var delta = b.eventData - _this._root,
-                    pc = (delta % 12 + 12) % 12,
-                    octave = Math.floor(delta / 12);
-                b.label = '<span class="jianpu-upper">' + (octave > 0 ? '•'.repeat(octave) : '') + '</span><span class="jianpu-number">' + ['1', '♭2', '2', '♭3', '3', '4', '♯4', '5', '♭6', '6', '♭7', '7'][pc] + '</span><span class="jianpu-lower">' + (octave < 0 ? '•'.repeat(-octave) : '') + '</span>';
-                b._domNode.setAttribute('aria-label', spelling + ' · ' + key);
-            } else b.label = mode === 'keys' ? key : note;
-            var plain = document.createElement('span');plain.innerHTML = note;
-            b._domNode.dataset.secondary = mode === 'keys' ? plain.textContent : key;
-            var primary = document.createElement('span');primary.className = 'key-main';while (b._domNode.firstChild) {
-                primary.appendChild(b._domNode.firstChild);
-            }b._domNode.appendChild(primary);
-            b._domNode.classList.add('theory-key');b._domNode.classList.toggle('jianpu-key', mode === 'jianpu');
-        });
-    }
-};
-
-Object.defineProperty(KeyMapper.prototype, 'pitchSet', {
-    set: function set(value) {
-        this._pitchSet = value;
-
-        this.updateNoteAssignments();
-    },
-    get: function get() {
-        return this._pitchSet;
-    }
-});
-
-Object.defineProperty(KeyMapper.prototype, 'root', {
-    set: function set(value) {
-        this._root = value;
-
-        this.updateNoteAssignments();
-    },
-    get: function get() {
-        return this._root;
-    }
-});
-
-Object.defineProperty(KeyMapper.prototype, 'transposition', {
-    set: function set(value) {
-        if (value != this._transposition) {
-            this._transposition = value;
-
-            this.updateNoteAssignments();
-        }
-    },
-    get: function get() {
-        return this._transposition;
-    }
-});
-
-Object.defineProperty(KeyMapper.prototype, 'layout', {
-    set: function set(layoutString) {
-        // TODO: check if changed, but pending existence of layout object?
-        var values = this._parseLayoutString(layoutString);
-
-        if (values) {
-            this._layout = values;
-            this.updateNoteAssignments();
-        } else {
-            console.log('invalid layout string: ' + layoutString);
-        }
-    }
-});
-
-module.exports = KeyMapper;
-
-},{"../theory-modern":71,"./theory.js":67}],67:[function(require,module,exports){
-"use strict";
-
-var MusEDTheory = function MusEDTheory() {
-    var self = this;
-
-    this.tones = [{ degree: 0, name: "C", enharmonic: false }, { degree: 1, name: "C#/Db", enharmonic: true }, { degree: 2, name: "D", enharmonic: false }, { degree: 3, name: "D#/Eb", enharmonic: true }, { degree: 4, name: "E", enharmonic: false }, { degree: 5, name: "F", enharmonic: false }, { degree: 6, name: "F#/Gb", enharmonic: true }, { degree: 7, name: "G", enharmonic: false }, { degree: 8, name: "G#/Ab", enharmonic: true }, { degree: 9, name: "A", enharmonic: false }, { degree: 10, name: "A#/Bb", enharmonic: true }, { degree: 11, name: "B", enharmonic: false }];
-
-    this.noteNames = ["C", "C# / Db", "D", "D# / Eb", "E", "F", "F# / Gb", "G", "G# / Ab", "A", "A# / Bb", "B"];
-    this.keyToNote = {}; // C8  == 108
-    this.noteToKey = {}; // 108 ==  C8
-    this.noteToPitchClass = {}; // 108 ==   C
-
-    // Fix note name formatting
-    for (var i = 0; i < this.noteNames.length; ++i) {
-        this.noteNames[i] = this.noteNames[i].replace('b', '<span class="accidental flat">&#9837;</span>');
-        this.noteNames[i] = this.noteNames[i].replace('#', '<span class="accidental sharp">&#9839;</span>');
-    }
-
-    (function () {
-        var A0 = 0x15; // first note
-        var C8 = 0x6C; // last note
-
-        for (var n = A0; n <= C8; n++) {
-            var pitchClass = self.noteNames[n % 12];
-            var octave = (n - 12) / 12 >> 0;
-            var noteName = pitchClass + octave;
-
-            self.keyToNote[noteName] = n;
-            self.noteToKey[n] = noteName;
-            self.noteToPitchClass[n] = pitchClass;
-        }
-    })();
-
-    // TODO switch pitchSet / scale terminology?
-
-    this.scaleGroups = [{
-        slug: 'major',
-        name: 'Major',
-        defaultScaleIndex: 3, // Major scale
-        pitchSets: [{ slug: 'harmonic-major', scaleSlug: 'harmonic-major', mode: 0,
-            roots: [0, 2, 4, 5, 7, 8, 11],
-            thirds: [4, 5, 7, 8, 11, 12, 14],
-            fifths: [7, 8, 11, 12, 14, 16, 17],
-            sevenths: [11, 12, 14, 16, 17, 19, 20]
-        }, { slug: 'lydian', scaleSlug: 'major', mode: 3,
-            roots: [0, 2, 4, 6, 7, 9, 11],
-            thirds: [4, 6, 7, 9, 11, 12, 14],
-            fifths: [7, 9, 11, 12, 14, 16, 18],
-            sevenths: [11, 12, 14, 16, 18, 19, 21]
-        }, { slug: 'lydian-dominant', scaleSlug: 'melodic-minor', mode: 3,
-            roots: [0, 2, 4, 6, 7, 9, 10],
-            thirds: [4, 6, 7, 9, 10, 12, 14],
-            fifths: [7, 9, 10, 12, 14, 16, 18],
-            sevenths: [10, 12, 14, 16, 18, 19, 21]
-        }, { slug: 'major', scaleSlug: 'major', mode: 0, name: 'Major',
-            roots: [0, 2, 4, 5, 7, 9, 11],
-            thirds: [4, 5, 7, 9, 11, 12, 14],
-            fifths: [7, 9, 11, 12, 14, 16, 17],
-            sevenths: [11, 12, 14, 16, 17, 19, 21]
-        }, { slug: 'major-blues', scaleSlug: 'blues', mode: 5,
-            roots: [0, 2, 3, 4, 7, 9],
-            thirds: [4, 5, 6, 7, 11, 12],
-            fifths: [7, 9, 9, 10, 14, 16],
-            sevenths: [10, 12, 12, 12, 17, 19]
-        }, { slug: 'major-pentatonic', scaleSlug: 'major-pentatonic', mode: 0,
-            roots: [0, 2, 4, 7, 9],
-            thirds: [4, 7, 9, 12, 14],
-            fifths: [9, 12, 14, 16, 19],
-            sevenths: [14, 16, 19, 21, 24]
-        }, { slug: 'mixolydian', scaleSlug: 'major', mode: 4,
-            roots: [0, 2, 4, 5, 7, 9, 10],
-            thirds: [4, 5, 7, 9, 10, 12, 14],
-            fifths: [7, 9, 10, 12, 14, 16, 17],
-            sevenths: [10, 12, 14, 16, 17, 19, 21] }, { slug: 'phrygian-dominant', scaleSlug: 'harmonic-minor', mode: 4,
-            roots: [0, 1, 4, 5, 7, 8, 10],
-            thirds: [4, 5, 7, 8, 10, 12, 13],
-            fifths: [7, 8, 10, 12, 13, 16, 17],
-            sevenths: [10, 12, 13, 16, 17, 19, 20]
-        }]
-    }, {
-        slug: 'minor',
-        name: 'Minor',
-        defaultScaleIndex: 5, // Natural Minor
-        pitchSets: [{ slug: 'dorian', scaleSlug: 'major', mode: 1,
-            roots: [0, 2, 3, 5, 7, 9, 10],
-            thirds: [3, 5, 7, 9, 10, 12, 14],
-            fifths: [7, 9, 10, 12, 14, 15, 17],
-            sevenths: [10, 12, 14, 15, 17, 19, 21] }, { slug: 'harmonic-minor', scaleSlug: 'harmonic-minor', mode: 0,
-            roots: [0, 2, 3, 5, 7, 8, 11],
-            thirds: [3, 5, 7, 8, 11, 12, 14],
-            fifths: [7, 8, 11, 12, 14, 15, 17],
-            sevenths: [11, 12, 14, 15, 17, 19, 20]
-        }, { slug: 'locrian', scaleSlug: 'major', mode: 6,
-            roots: [0, 1, 3, 5, 6, 8, 10],
-            thirds: [3, 5, 6, 8, 10, 12, 13],
-            fifths: [6, 8, 10, 12, 13, 15, 17],
-            sevenths: [10, 12, 13, 15, 17, 18, 20]
-        }, { slug: 'melodic-minor', scaleSlug: 'melodic-minor', mode: 0,
-            roots: [0, 2, 3, 5, 7, 9, 11],
-            thirds: [3, 5, 7, 9, 11, 12, 14],
-            fifths: [7, 9, 11, 12, 14, 15, 17],
-            sevenths: [11, 12, 14, 15, 17, 19, 21]
-        }, { slug: 'minor-pentatonic', scaleSlug: 'major-pentatonic', mode: 4,
-            roots: [0, 3, 5, 7, 10],
-            thirds: [5, 7, 10, 12, 15],
-            fifths: [10, 12, 15, 17, 19],
-            sevenths: [15, 17, 19, 22, 24]
-        }, { slug: 'natural-minor', scaleSlug: 'major', mode: 5, name: 'Natural Minor',
-            roots: [0, 2, 3, 5, 7, 8, 10],
-            thirds: [3, 5, 7, 8, 10, 12, 14],
-            fifths: [7, 8, 10, 12, 14, 15, 17],
-            sevenths: [10, 12, 14, 15, 17, 19, 20]
-        }, { slug: 'phrygian', scaleSlug: 'major', mode: 2,
-            roots: [0, 1, 3, 5, 7, 8, 10],
-            thirds: [3, 5, 7, 8, 10, 12, 13],
-            fifths: [7, 8, 10, 12, 13, 15, 17],
-            sevenths: [10, 12, 13, 15, 17, 19, 20]
-        }]
-    }, {
-        slug: 'other',
-        name: 'Other',
-        defaultScaleIndex: 1, // Blues
-        pitchSets: [{ slug: 'altered', scaleSlug: 'melodic-minor', mode: 6, name: 'Altered',
-            roots: [0, 1, 3, 4, 6, 8, 10],
-            thirds: [3, 4, 6, 8, 10, 12, 13],
-            fifths: [6, 8, 10, 12, 13, 15, 16],
-            sevenths: [10, 12, 13, 15, 16, 18, 20]
-        }, { slug: 'blues', scaleSlug: 'blues', mode: 0,
-            roots: [0, 3, 5, 6, 7, 10],
-            thirds: [4, 7, 9, 9, 11, 14],
-            fifths: [7, 10, 12, 12, 14, 17],
-            sevenths: [10, 13, 15, 15, 17, 20]
-        }, { slug: 'blues-octaves', scaleSlug: 'blues-octaves', mode: 0,
-            roots: [0, 3, 5, 6, 7, 10],
-            thirds: [12, 15, 17, 18, 19, 22],
-            fifths: [24, 27, 29, 30, 31, 34],
-            sevenths: [36, 39, 41, 42, 43, 46]
-        }, { slug: 'kansas-city', scaleSlug: 'kansas-city', mode: 0,
-            roots: [0, 2, 5, 7, 8],
-            thirds: [4, 6, 9, 11, 12],
-            fifths: [7, 9, 12, 14, 14],
-            sevenths: [10, 12, 15, 17, 14]
-        }, { slug: 'chromatic', scaleSlug: 'chromatic', mode: 0,
-            roots: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-            thirds: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
-            fifths: [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
-            sevenths: [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
-        }, { slug: 'diminished', scaleSlug: 'octatonic', mode: 1,
-            roots: [0, 1, 3, 4, 6, 7, 9, 10],
-            thirds: [3, 4, 6, 7, 9, 10, 12, 13],
-            fifths: [6, 7, 9, 10, 12, 13, 15, 16],
-            sevenths: [9, 10, 12, 13, 15, 16, 18, 19]
-        }, { slug: 'octatonic', scaleSlug: 'octatonic', mode: 0,
-            roots: [0, 2, 3, 5, 6, 8, 9, 11],
-            thirds: [3, 5, 6, 8, 9, 11, 12, 14],
-            fifths: [6, 8, 9, 11, 12, 14, 15, 17],
-            sevenths: [9, 11, 12, 14, 15, 17, 18, 20]
-        }, { slug: 'supermode', scaleSlug: 'supermode', mode: 0,
-            roots: [0, 2, 3, 4, 5, 7, 8, 9, 10, 11],
-            thirds: [4, 5, 7, 7, 9, 11, 12, 12, 14, 14],
-            fifths: [7, 9, 10, 11, 12, 14, 15, 16, 17, 17],
-            sevenths: [10, 12, 14, 14, 15, 17, 19, 19, 21, 21]
-        }, { slug: 'whole-tone', scaleSlug: 'whole-tone', mode: 0,
-            roots: [0, 2, 4, 6, 8, 10],
-            thirds: [4, 6, 8, 10, 12, 14],
-            fifths: [8, 10, 12, 14, 16, 18],
-            sevenths: [10, 12, 14, 16, 18, 20]
-        }]
-    }];
-
-    this.scales = [{
-        slug: 'major',
-        name: 'Major',
-        scaleDegrees: [0, 2, 4, 5, 7, 9, 11],
-        majorRelations: [0, 2, 4, 5, 7, 9, 11],
-        intervals: [0, 2, 2, 1, 2, 2, 2, 1],
-        modeNames: ['Ionian', 'Dorian', 'Phrygian', 'Lydian', 'Mixolydian', 'Aeolian', 'Locrian']
-    }, {
-        slug: 'major-pentatonic',
-        name: 'Major Pentatonic',
-        scaleDegrees: [0, 2, 4, 7, 9],
-        majorRelations: [0, 2, 4, 7, 9],
-        intervals: [0, 3, 2, 2, 3, 2],
-        modeNames: ['Major Pentatonic', '2', '3', '4', 'Minor Pentatonic']
-    }, {
-        slug: 'blues-octaves',
-        name: 'Blues (Scale)',
-        scaleDegrees: [0, 3, 5, 6, 7, 10],
-        majorRelations: [0, 4, 5, 5, 7, 11],
-        intervals: [0, 3, 2, 1, 1, 3, 2],
-        modeNames: ['Blues (Scale)', '2', '3', '4', '5', 'Major Blues']
-    }, {
-        slug: 'blues',
-        name: 'Blues (Chords)',
-        scaleDegrees: [0, 3, 5, 6, 7, 10],
-        majorRelations: [0, 4, 5, 5, 7, 11],
-        intervals: [0, 3, 2, 1, 1, 3, 2],
-        modeNames: ['Blues (Chords)', '2', '3', '4', '5', 'Major Blues']
-    }, {
-        slug: 'kansas-city',
-        name: 'Kansas City Blues',
-        scaleDegrees: [0, 2, 5, 7, 8], // TODO: apparently the first note actually the "5", need to support this
-        majorRelations: [0, 2, 5, 7, 9],
-        intervals: [0, 2, 3, 2, 1, 4],
-        modeNames: ['Kansas City Blues', '2', '3', '4', '5']
-    }, {
-        slug: 'whole-tone',
-        name: 'Whole Tone',
-        scaleDegrees: [0, 2, 4, 6, 8, 10],
-        majorRelations: [0, 2, 4, 5, 7, 9],
-        intervals: [0, 2, 2, 2, 2, 2, 2],
-        modeNames: ['Whole Tone', '2', '3', '4', '5', '6']
-    }, {
-        slug: 'melodic-minor',
-        name: 'Melodic Minor',
-        scaleDegrees: [0, 2, 3, 5, 7, 9, 11],
-        majorRelations: [0, 2, 4, 5, 7, 9, 11],
-        intervals: [2, 1, 2, 2, 2, 2, 1],
-        modeNames: ['Melodic Minor', 'Phrygian natural 6', 'Lydian Augmented', 'Lydian Dominant', 'Hindu', 'Locrian natural 2', 'Super Locrian']
-    }, {
-        slug: 'harmonic-major',
-        name: 'Harmonic Major',
-        scaleDegrees: [0, 2, 4, 5, 7, 8, 11],
-        majorRelations: [0, 2, 4, 5, 7, 9, 11],
-        intervals: [0, 2, 2, 1, 2, 1, 3],
-        modeNames: ['Harmonic Major', '2', '3', '4', '5', '6', '7']
-    }, {
-        slug: 'harmonic-minor',
-        name: 'Harmonic Minor',
-        scaleDegrees: [0, 2, 3, 5, 7, 8, 11],
-        majorRelations: [0, 2, 4, 5, 7, 9, 11],
-        intervals: [0, 2, 1, 2, 2, 1, 3],
-        modeNames: ['Harmonic Minor', 'Locrian natural 6', 'Harmonic Major', 'Romanian', 'Phrygian Dominant', 'Lydian sharp 2', 'Alt double flat 7']
-    }, {
-        slug: 'octatonic',
-        name: 'Octatonic',
-        scaleDegrees: [0, 1, 3, 4, 6, 7, 9, 10],
-        // majorRelations : [ 0, 2, 4, 4, 5, 7, 9,11 ],
-        majorRelations: [0, 0, 2, 4, 5, 7, 9, 11],
-        intervals: [1, 2, 1, 2, 1, 2, 1, 2],
-        modeNames: ['Octatonic', 'Diminished']
-    }, {
-        slug: 'supermode',
-        name: 'Supermode',
-        scaleDegrees: [0, 2, 3, 4, 5, 7, 8, 9, 10, 11],
-        majorRelations: [0, 2, 2, 4, 5, 7, 7, 9, 11, 11],
-        intervals: [2, 1, 1, 1, 2, 1, 1, 1, 1, 1],
-        modeNames: ['Supermode', '2', '3', '4', '5', '6', '7', '8', '9', '10']
-    }, {
-        slug: 'chromatic',
-        name: 'Chromatic',
-        scaleDegrees: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-        majorRelations: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-        intervals: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        modeNames: ['Chromatic']
-    }];
-
-    this.slugToScaleGroup = {};
-    (function () {
-        for (var i = 0; i < self.scaleGroups.length; i++) {
-            self.slugToScaleGroup[self.scaleGroups[i].slug] = self.scaleGroups[i];
-        }
-    })();
-
-    this.slugToScale = {};
-    (function () {
-        for (var i = 0; i < self.scales.length; i++) {
-            self.slugToScale[self.scales[i].slug] = self.scales[i];
-        }
-    })();
-
-    this.slugToPitchSet = {};
-    (function () {
-        for (var i = 0; i < self.scaleGroups.length; i++) {
-            var pitchSets = self.scaleGroups[i].pitchSets;
-
-            for (var j = 0; j < pitchSets.length; j++) {
-                var pitchSet = pitchSets[j];
-
-                if (pitchSet.slug in self.slugToPitchSet) {
-                    console.warn('duplicate pitchSet slug: ' + pitchSet.slug);
-                }
-                self.slugToPitchSet[pitchSet.slug] = pitchSet;
-            }
-        }
-    })();
-
-    this.init();
-};
-
-MusEDTheory.prototype = {
-    init: function init() {},
-
-    spellingOffsetInScale: function spellingOffsetInScale(scale, degree) {
-        var offset = 0;
-
-        var foundIndex = scale.scaleDegrees.findIndex(function (scaleDegree) {
-            return degree == scaleDegree;
-        });
-
-        if (foundIndex >= 0) {
-            offset = degree - scale.majorRelations[foundIndex];
-        }
-
-        return offset;
-    },
-
-    nameForNote: function nameForNote(note, rootNote, pitchSet) {
-        var degree = note % 12;
-        var root = this.tones[rootNote % 12];
-
-        degree = degree - root.degree;
-
-        return this.nameForDegree(degree, root, pitchSet);
-    },
-
-    nameForDegree: function nameForDegree(degree, root, pitchSet) {
-        while (degree < 0) {
-            degree += 12;
-        }while (degree > 24) {
-            // truncate higher intervals
-            degree -= 12;
-        }var scale = this.slugToScale[pitchSet.scaleSlug];
-        var offsetInScale = this.spellingOffsetInScale(scale, degree % 12); // NOTE: assuming this is -1, 0, or 1 !
-        var normalizedDegree = (root.degree + degree - offsetInScale + 12) % 12;
-
-        var degreeTone = this.tones[normalizedDegree];
-        var nameTone = degreeTone;
-
-        if (degreeTone.enharmonic) // TODO: make exception for pitchSet.scaleSlug == 'chromatic' ?
-            {
-                var key = this.tones[(root.degree + 12 - scale.scaleDegrees[pitchSet.mode]) % 12];
-                var relation = key.enharmonic || key.degree == 5 ? -1 : 1; // enharmonic keys will use flats by convention, natural keys except F (=5), use sharps
-
-                nameTone = this.tones[normalizedDegree - relation];
-
-                offsetInScale += relation;
-            }
-
-        var sharpOrFlat = "";
-
-        if (offsetInScale != 0) {
-
-            sharpOrFlat = '<span class="accidental ';
-            var numAccidentals = Math.abs(offsetInScale);
-
-            if (numAccidentals == 1) {
-                sharpOrFlat += offsetInScale > 0 ? 'sharp">&#9839;' : 'flat">&#9837;';
-            } else if (numAccidentals == 2) {
-                sharpOrFlat += offsetInScale > 0 ? 'doublesharp">&#119082;' : 'doubleflat">&#119083';
-            } else {
-                sharpOrFlat += '">';
-                console.warn("Unsupported number of accidentals: " + numAccidentals);
-            }
-
-            sharpOrFlat += '</span>';
-        }
-
-        var name = nameTone.name + sharpOrFlat;
-
-        return name;
-    }
-};
-
-var Theory = new MusEDTheory();
-
-module.exports = Theory;
-
-},{}],68:[function(require,module,exports){
-'use strict';
-
-var MIDI = function MIDI() {
-
-  try {
-    var midiSuccess = function midiSuccess(midiAccess) {
-      midi.inputs = midiAccess.inputs.values();
-      midi.outputs = midiAccess.outputs.values();
-
-      setupMidiIn();
-      setupMidiOut();
-    };
-
-    var midiError = function midiError(message) {
-      console.log('Error: ' + message);
-    };
-
-    var setupMidiIn = function setupMidiIn() {
-      var inputs = midi.inputs;
-      var hasAtLeastOneDevice = false;
-
-      //console.log(inputs);
-
-      // setup input
-      for (var input = inputs.next(); input && !input.done; input = inputs.next()) {
-        input.value.onmidimessage = MIDIMessageEventHandler;
-        midi.input = input.value;
-        //console.log(input.value);
-        hasAtLeastOneDevice = true;
-      }
-      if (!hasAtLeastOneDevice) {
-        midiError('No MIDI Input');
-      }
-    };
-
-    var setupMidiOut = function setupMidiOut() {
-      var outputs = midi.outputs;
-      var hasMidiOutput = false;
-      for (var output = outputs.next(); output && !output.done; output = output.next()) {
-
-        midi.output = output.value;
-        hasMidiOutput = true;
-
-        // added this to avoid throwing an error, which is probably a bug in web midi
-        if (typeof output.next === 'undefined') {
-          return;
-        }
-      }
-
-      if (!hasMidiOutput) {
-        midiError('No MIDI Output');
-      }
-    };
-
-    /**
-     *  this method is called when a midi message is received
-     */
-
-
-    var MIDIMessageEventHandler = function MIDIMessageEventHandler(event) {
-      // Mask off the lower nibble (MIDI channel, which we don't care about)
-      switch (event.data[0] & 0xf0) {
-        case 0x90:
-          if (event.data[2] != 0) {
-            // if velocity != 0, this is a note-on message
-            // midi.input.play(event.data[1]);
-            return;
-          }
-        // if velocity == 0, fall thru: it's a note-off.  MIDI's weird, y'all.
-        case 0x80:
-          // noteOff(event.data[1]);
-          return;
-      }
-    };
-
-    /**
-     *  Format MIDI data to be sent to midi output.
-     *
-     *  Examples:
-     *    MIDI.send('attack', 60, 127) --> triggers attack on middle C
-     *    MIDI.send('release', 60, 0) --> triggers release of middle C
-     *  @param  {String} message  'attack' or 'release'
-     *  @param  {Number} note     0 to 127
-     *  @param  {Number} velocity 0 to 127
-     */
-
-
-    // object to return
-    var midi = {};
-
-    midi.init = function () {
-      if ('requestMIDIAccess' in navigator) {
-        navigator.requestMIDIAccess().then(midiSuccess, midiError);
-      }
-    };
-
-    midi.send = function (message, note, velocity) {
-      var msg = [undefined, undefined, undefined];
-
-      switch (message) {
-        case 'attack':
-          msg[0] = 0x90;
-          break;
-        case 'release':
-          msg[0] = 0x80;
-          velocity = 0;
-          break;
-        case 'pitchbend':
-          msg[0] = 0xE0;
-          break;
-        default:
-          console.log('midi error, did not recognize ' + message);
-          return;
-      }
-
-      if (typeof note !== 'number' || typeof velocity !== 'number') {
-        console.log('midi error, did not recognize ' + note + ' or ' + velocity);
-        return;
-      }
-      msg[1] = note;
-
-      msg[2] = velocity;
-
-      if (midi.output) midi.output.send(msg);
-    };
-
-    /**
-     *  Send MIDI message to bend pitch
-     *  between -1.0, 0 (normal) and 1.0 semitones
-     *
-     *  @method  pitchBend
-     *  @param  {Number} amount Any decimal between -1.0 and 1.0
-     */
-    midi.pitchBend = function (amount) {
-
-      // map range util
-      function map_range(value, low1, high1, low2, high2) {
-        return low2 + (high2 - low2) * (value - low1) / (high1 - low1);
-      }
-      var val = map_range(amount, -1, 1, 0, 127);
-      midi.output.send([0xE0, 0, val]);
-    };
-
-    return midi;
-  } catch (e) {
-    throw e;
-  }
-};
-
-module.exports = new MIDI();
-
-},{}],69:[function(require,module,exports){
-'use strict';
-
-var Util = require('mused-app-core/js/Util');
-
-var MyJSONController = function MyJSONController() {
-    //this.myJSONurl          = 'https://api.myjson.com/bins/';
-    this.myJSONurl = 'https://api.musedlab.org/bins/';
-    this.CMSurl = 'https://musedlab-cms.herokuapp.com/api/sessions/';
-    //this.CMSurl            = 'http://localhost:5000/api/sessions/';
-    this.myJSONcontentType = 'application/json; charset=utf-8';
-};
-
-MyJSONController.prototype = {
-
-    createSession: function createSession(sessionData, cmsData) {
-        var self = this;
-
-        return new Promise(function (resolve, reject) {
-            $.ajax({
-                url: self.myJSONurl,
-                type: 'POST',
-                data: JSON.stringify(sessionData),
-                crossDomain: true,
-                contentType: self.myJSONcontentType,
-                dataType: 'json',
-
-                success: function success(response, textStatus, jqXHR) {
-                    var sessionSlug = response.uri.split('/').pop(); // parse  unique id of our data storage
-
-                    sessionData.options.sessionSlug = sessionSlug;
-                    sessionData.sessionURL = self.myJSONurl + sessionSlug;
-                    cmsData.dataUrl = sessionData.sessionURL;
-
-                    console.log('created session: ' + sessionSlug);
-                    self._logToCMS(sessionSlug, cmsData);
-
-                    resolve(sessionData);
-                },
-                error: function error(e) {
-                    reject(Error("couldn't create session: " + e.statusText));
-                }
-            });
-        });
-    },
-
-    _logToCMS: function _logToCMS(sessionSlug, cmsData) {
-        var self = this;
-
-        return new Promise(function (resolve, reject) {
-            $.ajax({
-                url: self.CMSurl,
-                type: 'POST',
-                data: JSON.stringify(cmsData),
-                crossDomain: true,
-                contentType: self.myJSONcontentType,
-                dataType: 'json',
-
-                success: function success(response, textStatus, jqXHR) {
-                    console.log("logged session [" + sessionSlug + '] to CMS!');
-
-                    resolve();
-                },
-                error: function error(e) {
-                    reject(Error("couldn't log session [" + sessionSlug + '] to CMS because ' + e.statusText));
-                }
-            });
-        });
-    },
-
-    updateSession: function updateSession(sessionData, successCallback) {
-        var self = this;
-        var sessionURL = this.myJSONurl + sessionData.options.sessionSlug;
-
-        return new Promise(function (resolve, reject) {
-            $.ajax({
-                url: sessionURL,
-                type: 'PUT',
-                data: JSON.stringify(sessionData),
-                contentType: self.myJSONcontentType,
-                dataType: 'json',
-
-                success: function success(response, textStatus, jqXHR) {
-                    console.log('success updating session: ' + sessionURL);
-                    successCallback();
-                },
-                error: function error(e) {
-                    reject(Error("couldn't update session [" + sessionURL + '] because ' + e.statusText));
-                }
-            });
-        });
-    },
-
-    loadSession: function loadSession(sessionSlug) {
-        var eventLog = null;
-        var sessionURL = this.myJSONurl + sessionSlug;
-
-        return new Promise(function (resolve, reject) {
-            Util.get(sessionURL).then(JSON.parse).then(function (json) {
-                console.log('got data from hash ' + sessionSlug);
-                eventLog = json;
-
-                resolve(eventLog);
-            }, function (error) {
-                reject(Error("couldn't load hash: " + sessionSlug + '] because ' + error));
-            });
-        });
-    }
-};
-
-module.exports = MyJSONController;
-
-},{"mused-app-core/js/Util":45}],70:[function(require,module,exports){
-'use strict';
-
-var MyJSONController = require('./myJsonController.js');
-
-//TODO: won't need this once hooked up to MusED.AbstractSessionManager
-var Configuration = require('mused-app-core/js/internal/ConfigManager');
-
-var Tone = require('tone');
-
-var Take = function Take(settings) {
-    this.version = 1;
-    this.created = new Date();
-    this.start = Math.round(Tone.now() * 10000) / 10000;
-    this.end = null;
-    this.events = [];
-    this.initialSettings = settings;
-};
-
-var SessionManager = function SessionManager(sourceSlug) {
-    // TODO: read from file/config?
-    var sources = {
-        dev: {
-            name: 'Development (internal use)',
-            cmsSetupID: '5617f6e3b5fdc003002148fa'
-        },
-        uat: {
-            name: 'User Acceptance Testing',
-            cmsSetupID: '563a82d2c8a3bf030014964b'
-        },
-        pub: {
-            name: 'Public (anonymous)',
-            cmsSetupID: '5615808f185d380300d5c24c'
-        },
-        pwym: {
-            name: 'Play with Your Music',
-            cmsSetupID: '561fd1ff8921780300d43068'
-        },
-        cmsd: {
-            name: 'PuzzleCards',
-            cmsSetupID: '564b99d884a1c20300c332dd'
-        },
-        yciw: {
-            name: 'Young Composers and Improvisers Workshop',
-            cmsSetupID: '564b99d884a1c20300c332dd'
-        },
-        sfly: {
-            name: 'Soundfly',
-            cmsSetupID: '56a27e9f59ae4a0300ee1eb0'
-        }
-    };
-
-    var defaultSourceSlug = 'pub';
-    var sourceSlug = sourceSlug in sources ? sourceSlug : defaultSourceSlug;
-
-    this._offline = false; // assume we're online, but client can turn off
-    this.isDirty = false;
-    this.saveInProgress = false;
-    this.takeInProgress = false;
-    this.lastKeyTime = 0;
-    this.eventLog = {};
-    this.currentTake = null;
-    this.myJSON = new MyJSONController();
-    this.cmsData = {
-        title: 'aQWERTYon session',
-        setup: sources[sourceSlug].cmsSetupID,
-        statusDate: '',
-        dataUrl: ''
-    };
-
-    this.saveInterval = 2; // check if dirty every 2 sec.
-    this.lullInterval = 3; // if user hasn't been playing for at least 3 sec, it's a lull
-
-    setInterval(this.updateSession.bind(this), this.saveInterval * 1000);
-};
-
-SessionManager.prototype = {
-    appName: 'aQWERTYon',
-    currentVersion: 6,
-
-    /*
-     Return a promise that resolves to sessionID's session, or else a new session if sessionID is empty or can't
-     be loaded.
-     */
-    loadSession: function loadSession(options) {
-        var self = this;
-        var sessionID = options.sessionSlug;
-        this.eventLog = {};
-
-        return new Promise(function (resolve, reject) {
-            if (sessionID) {
-                self.myJSON.loadSession(sessionID).then(function (eventLog) {
-                    if (eventLog.version < 3) {
-                        // version 3 introduced these:
-                        eventLog.app = self.appName;
-                        eventLog.options.features.scaleControls = true;
-                    }
-                    if (eventLog.version < 4) {
-                        // version 4 introduced these:
-                        eventLog.options.features.allControls = true;
-                        eventLog.options.features.showTakes = true;
-                        eventLog.options.features.showSounds = true;
-                    }
-                    if (eventLog.version < 5) {
-                        // version 5 introduced these:
-                        eventLog.options.features.audioEngine = 'classic';
-
-                        // And deprecated this:
-                        delete eventLog.options.embed;
-                    }
-                    if (eventLog.version < 6) {
-                        // version 6 introduced separate versioning for the options object
-                        eventLog.optionsVersion = 1;
-                    }
-
-                    eventLog.version = self.currentVersion;
-
-                    // Now, update the options object (if necessary)
-                    eventLog.options = Configuration.updateOptionsObject(eventLog.optionsVersion, eventLog.options);
-                    eventLog.optionsVersion = Configuration.version;
-
-                    self.eventLog = eventLog;
-
-                    if (options.cloneSession) {
-                        resolve(self.createSession(eventLog.options, self.eventLog));
-                    } else {
-                        ga('send', 'event', 'museid', 'load', sessionID);
-
-                        resolve(self.eventLog);
-                    }
-                }, function (error) {
-                    console.log("WARN: couldn't retrieve session [" + sessionID + '] because' + error + '; Creating new session...');
-
-                    resolve(self.createSession(options));
-                });
-            } else {
-                resolve(self.createSession(options));
-            }
-        });
-    },
-
-    resumeSession: function resumeSession(options) {
-        console.log(options);
-        this.eventLog.options = options;
-        this.currentTake = new Take({
-            audioEngine: options.features.audioEngine,
-            sound: options.soundSlug,
-            volume: options.volume,
-            scale: options.scaleSlug,
-            root: options.midiRoot
-        });
-        this.eventLog.freeplay.push(this.currentTake);
-
-        this.updateSession(true);
-    },
-
-    updateSession: function updateSession(force) {
-        if (this._offline || this.takeInProgress || !this.isDirty && !force) {
-            return; // short-circuit
-        }
-
-        var lullMillis = Tone.now() - this.lastKeyTime;
-        var isLull = lullMillis > this.lullInterval; // make sure it's X seconds since last keypress
-        if (!isLull && !force) {
-            console.log('user playing; skipping save... (' + lullMillis + ')');
-            return; // short-circuit
-        }
-
-        if (!this.saveInProgress) {
-            this.saveInProgress = true;
-            console.log('saving...');
-
-            var self = this;
-
-            if (!force && !this.takeInProgress) {
-                this.currentTake.end = Math.round(Tone.now() * 10000) / 10000; // the end, at least until more is saved
-            }
-
-            this.myJSON.updateSession(this.eventLog, function () {
-                console.log('saved!');
-                self.isDirty = false;
-                self.saveInProgress = false;
-            });
-        } else {
-            console.warn('awaiting in-progress save...');
-        }
-    },
-
-    /*
-     Return a promise that resolves to a newly created session
-     */
-    createSession: function createSession(options, eventLog) {
-        var self = this;
-
-        return new Promise(function (resolve, reject) {
-            var now = new Date();
-
-            self.cmsData.statusDate = now.toJSON();
-            self.eventLog = {
-                app: self.appName,
-                version: self.currentVersion,
-                sessionURL: '',
-                parentURL: eventLog ? eventLog.sessionURL : '',
-                options: options,
-                optionsVersion: Configuration.version,
-                takes: eventLog ? eventLog.takes : [], // array of takes
-                freeplay: []
-            };
-
-            if (self.eventLog.parentURL) {
-                self.eventLog.options.clone = false;
-            }
-
-            self.myJSON.createSession(self.eventLog, self.cmsData).then(function (eventLog) {
-                ga('send', 'event', 'museid', 'create', eventLog.options.sessionSlug);
-
-                resolve(eventLog);
-            }, function (error) {
-                reject(error);
-            });
-        });
-    },
-
-    saveOption: function saveOption(optionPath, optionValue) {
-        if (this._offline) {
-            // TODO: support even when offline?
-            return;
-        }
-
-        var optionsObject = this.eventLog.options;
-
-        for (var i = 0; i < optionPath.length - 1; ++i) {
-            optionsObject = optionsObject[optionPath[i]];
-        }
-
-        optionsObject[optionPath[i]] = optionValue;
-        this.isDirty = true;
-    },
-
-    logEvent: function logEvent(type, data) {
-        if (this._offline) {
-            // TODO: support even when offline?
-            return;
-        }
-
-        this.lastKeyTime = Tone.now();
-        this.isDirty = true;
-
-        var relativeTime = this.lastKeyTime - this.currentTake.start;
-
-        // Round relative time so that it takes up less space in JSON
-        relativeTime = Math.round(relativeTime * 10000) / 10000;
-
-        var event = {
-            type: type,
-            time: relativeTime,
-            data: data
-        };
-
-        this.currentTake.events.push(event);
-    },
-
-    startTake: function startTake() {
-        this.currentTake = new Take({});
-        this.eventLog.takes.push(this.currentTake);
-        this.takeInProgress = true;
-    },
-
-    saveTake: function saveTake() {
-        this.currentTake.end = Tone.context.currentTime;
-        this.takeInProgress = false;
-
-        this.updateSession(true);
-        //console.log("saving take:\n" + JSON.stringify(this.currentTake));
-
-        this.currentTake = new Take({});
-        this.eventLog.freeplay.push(this.currentTake);
-    }
-};
-
-Object.defineProperty(SessionManager.prototype, 'offline', {
-    get: function get() {
-        return this._offline;
-    },
-
-    set: function set(value) {
-        this._offline = value;
-    }
-});
-
-module.exports = SessionManager;
-
-},{"./myJsonController.js":69,"mused-app-core/js/internal/ConfigManager":47,"tone":41}],71:[function(require,module,exports){
-'use strict';
-
-var _slicedToArray = function () { function sliceIterator(arr, i) { var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"]) _i["return"](); } finally { if (_d) throw _e; } } return _arr; } return function (arr, i) { if (Array.isArray(arr)) { return arr; } else if (Symbol.iterator in Object(arr)) { return sliceIterator(arr, i); } else { throw new TypeError("Invalid attempt to destructure non-iterable instance"); } }; }();
-
-// Adapted from the aQWERTYon Theory build's Tonal scale/spelling and VexFlow display.
-var tonal = require('@tonaljs/tonal');
-var scales = require('./scales.json');
-var Vex = require('vexflow/releases/vexflow-debug');
-var roots = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
-var pretty = function pretty(n) {
-  return n.replace(/#/g, '♯').replace(/b/g, '♭');
-};
-function rootName(midi) {
-  return roots[(midi % 12 + 12) % 12] + (Math.floor(midi / 12) - 1);
-}
-function scaleNotes(root, slug) {
-  var s = scales[slug];return s ? s.intervals.split(' ').map(function (i) {
-    return tonal.transpose(tonal.note(rootName(root)).pc, i);
-  }) : [];
-}
-function spell(midi, root, slug) {
-  var candidates = scaleNotes(root, slug),
-      pc = (midi % 12 + 12) % 12;
-  var chosen = candidates.find(function (n) {
-    return tonal.note(n).chroma === pc;
-  }) || roots[pc];
-  for (var oct = -2; oct <= 10; oct++) {
-    if (tonal.note(chosen + oct).midi === midi) return chosen + oct;
-  }return rootName(midi);
-}
-function renderStaff(host, notes) {
-  host.innerHTML = '';var renderer = new Vex.Flow.Renderer(host, Vex.Flow.Renderer.Backends.SVG);renderer.resize(360, 260);var context = renderer.getContext();
-  var treble = new Vex.Flow.Stave(12, 30, 335).addClef('treble'),
-      bass = new Vex.Flow.Stave(12, 135, 335).addClef('bass');
-  treble.setContext(context).draw();bass.setContext(context).draw();var start = Math.max(treble.getNoteStartX(), bass.getNoteStartX());treble.setNoteStartX(start);bass.setNoteStartX(start);
-  var _arr = [['treble', treble], ['bass', bass]];
-
-  var _loop = function _loop() {
-    var _arr$_i = _slicedToArray(_arr[_i], 2),
-        clef = _arr$_i[0],
-        stave = _arr$_i[1];
-
-    var keys = notes.filter(function (n) {
-      return tonal.note(n).midi >= 60 === (clef === 'treble');
-    }).sort(function (a, b) {
-      return tonal.note(a).midi - tonal.note(b).midi;
-    }).map(function (n) {
-      return tonal.note(n).pc + '/' + tonal.note(n).oct;
-    });
-    if (!keys.length) return 'continue';
-    var chord = new Vex.Flow.StaveNote({ clef: clef, keys: keys, duration: 'w' }),
-        voice = new Vex.Flow.Voice({ num_beats: 4, beat_value: 4 }).addTickables([chord]);voice.setStave(stave);Vex.Flow.Accidental.applyAccidentals([voice], 'C');new Vex.Flow.Formatter().joinVoices([voice]).format([voice], 240);voice.setContext(context).draw();
-  };
-
-  for (var _i = 0; _i < _arr.length; _i++) {
-    var _ret = _loop();
-
-    if (_ret === 'continue') continue;
-  }
-  var svg = host.querySelector('svg');svg.setAttribute('viewBox', '0 0 360 260');svg.setAttribute('role', 'img');svg.setAttribute('aria-label', 'Live staff notation');
-}
-function renderPreview(host, midis, held, root, slug) {
-  host.innerHTML = '';var clefs = ['treble', 'bass'].filter(function (c) {
-    return midis.some(function (m) {
-      return m >= 60 === (c === 'treble');
-    });
-  }),
-      height = Math.max(110, clefs.length * 100 + 10);var renderer = new Vex.Flow.Renderer(host, Vex.Flow.Renderer.Backends.SVG);renderer.resize(440, height);var ctx = renderer.getContext();
-  var _iteratorNormalCompletion = true;
-  var _didIteratorError = false;
-  var _iteratorError = undefined;
-
-  try {
-    var _loop2 = function _loop2() {
-      var _step$value = _slicedToArray(_step.value, 2),
-          i = _step$value[0],
-          clef = _step$value[1];
-
-      var y = i * 100;
-      var stave = new Vex.Flow.Stave(8, y, 424).addClef(clef);stave.setContext(ctx).draw();
-      var group = midis.filter(function (m) {
-        return m >= 60 === (clef === 'treble');
-      });
-      if (!group.length) return 'continue';
-      var notes = group.map(function (m) {
-        var n = tonal.note(spell(m, root, slug)),
-            note = new Vex.Flow.StaveNote({ clef: clef, keys: [n.pc + '/' + n.oct], duration: 'q' });if (n.acc) note.addAccidental(0, new Vex.Flow.Accidental(n.acc));note.setStyle({ fillStyle: held.includes(m) ? '#167a70' : '#687a62', strokeStyle: held.includes(m) ? '#167a70' : '#687a62' });return note;
-      });
-      var voice = new Vex.Flow.Voice({ num_beats: group.length, beat_value: 4 }).addTickables(notes);voice.setStave(stave);new Vex.Flow.Formatter().joinVoices([voice]).format([voice], 350);voice.setContext(ctx).draw();
-    };
-
-    for (var _iterator = clefs.entries()[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
-      var _ret2 = _loop2();
-
-      if (_ret2 === 'continue') continue;
-    }
-  } catch (err) {
-    _didIteratorError = true;
-    _iteratorError = err;
-  } finally {
-    try {
-      if (!_iteratorNormalCompletion && _iterator.return) {
-        _iterator.return();
-      }
-    } finally {
-      if (_didIteratorError) {
-        throw _iteratorError;
-      }
-    }
-  }
-
-  var svg = host.querySelector('svg');var bounds = svg.getBBox(),
-      top = Math.min(0, bounds.y - 12),
-      bottom = Math.max(height, bounds.y + bounds.height + 12);svg.setAttribute('viewBox', '0 ' + top + ' 440 ' + (bottom - top));svg.setAttribute('height', bottom - top);svg.setAttribute('role', 'img');svg.setAttribute('aria-label', 'Mapped keyboard octave; played notes highlighted');
-}
-module.exports = { roots: roots, rootName: rootName, pretty: pretty, spell: spell, scaleNotes: scaleNotes, renderStaff: renderStaff, renderPreview: renderPreview };
-
-},{"./scales.json":72,"@tonaljs/tonal":21,"vexflow/releases/vexflow-debug":42}],72:[function(require,module,exports){
-module.exports={
-  "harmonic-major": {
-    "name": "Harmonic Major",
-    "intervals": "1P 2M 3M 4P 5P 6m 7M",
-    "thirdIntervals": "3M 4P 5P 6m 7M 8P 9M",
-    "fifthIntervals": "5P 6m 7M 8P 9M 10M 11P",
-    "seventhIntervals": "7M 8P 9M 10M 11P 12P 13m"
-  },
-  "lydian": {
-    "name": "Lydian",
-    "intervals": "1P 2M 3M 4A 5P 6M 7M",
-    "thirdIntervals": "3M 4A 5P 6M 7M 8P 9M",
-    "fifthIntervals": "5P 6M 7M 8P 9M 10M 11A",
-    "seventhIntervals": "7M 8P 9M 10M 11A 12P 13M"
-  },
-  "lydian-dominant": {
-    "name": "Lydian Dominant",
-    "intervals": "1P 2M 3M 4A 5P 6M 7m",
-    "thirdIntervals": "3M 4A 5P 6M 7m 8P 9M",
-    "fifthIntervals": "5P 6M 7m 8P 9M 10M 11A",
-    "seventhIntervals": "7m 8P 9M 10M 11A 12P 13M"
-  },
-  "major": {
-    "name": "Major",
-    "intervals": "1P 2M 3M 4P 5P 6M 7M",
-    "thirdIntervals": "3M 4P 5P 6M 7M 8P 9M",
-    "fifthIntervals": "5P 6M 7M 8P 9M 10M 11P",
-    "seventhIntervals": "7M 8P 9M 10M 11P 12P 13M"
-  },
-  "major-blues": {
-    "name": "Major Blues",
-    "intervals": "1P 2M 3m 3M 5P 6M",
-    "thirdIntervals": "3M 4P 4A 5P 7M 8P",
-    "fifthIntervals": "5P 6M 6M 7m 9M 10M",
-    "seventhIntervals": "7m 8P 8P 8P 11P 12P"
-  },
-  "major-pentatonic": {
-    "name": "Major Pentatonic",
-    "intervals": "1P 2M 3M 5P 6M",
-    "thirdIntervals": "3M 5P 6M 8P 9M",
-    "fifthIntervals": "6M 8P 9M 10M 12P",
-    "seventhIntervals": "9M 10M 12P 13M 15P"
-  },
-  "mixolydian": {
-    "name": "Mixolydian",
-    "intervals": "1P 2M 3M 4P 5P 6M 7m",
-    "thirdIntervals": "3M 4P 5P 6M 7m 8P 9M",
-    "fifthIntervals": "5P 6M 7m 8P 9M 10M 11P",
-    "seventhIntervals": "7m 8P 9M 10M 11P 12P 13M"
-  },
-  "phrygian-dominant": {
-    "name": "Phrygian Dominant",
-    "intervals": "1P 2m 3M 4P 5P 6m 7m",
-    "thirdIntervals": "3M 4P 5P 6m 7m 8P 9m",
-    "fifthIntervals": "5P 6m 7m 8P 9m 10M 11P",
-    "seventhIntervals": "7m 8P 9m 10M 11P 12P 13m"
-  },
-  "dorian": {
-    "name": "Dorian",
-    "intervals": "1P 2M 3m 4P 5P 6M 7m",
-    "thirdIntervals": "3m 4P 5P 6M 7m 8P 9M",
-    "fifthIntervals": "5P 6M 7m 8P 9M 10m 11P",
-    "seventhIntervals": "7m 8P 9M 10m 11P 12P 13M"
-  },
-  "harmonic-minor": {
-    "name": "Harmonic Minor",
-    "intervals": "1P 2M 3m 4P 5P 6m 7M",
-    "thirdIntervals": "3m 4P 5P 6m 7M 8P 9M",
-    "fifthIntervals": "5P 6m 7M 8P 9M 10m 11P",
-    "seventhIntervals": "7M 8P 9M 10m 11P 12P 13m"
-  },
-  "locrian": {
-    "name": "Locrian",
-    "intervals": "1P 2m 3m 4P 5d 6m 7m",
-    "thirdIntervals": "3m 4P 5d 6m 7m 8P 9m",
-    "fifthIntervals": "5d 6m 7m 8P 9m 10m 11P",
-    "seventhIntervals": "7m 8P 9m 10m 11P 12d 13m"
-  },
-  "melodic-minor": {
-    "name": "Melodic Minor",
-    "intervals": "1P 2M 3m 4P 5P 6M 7M",
-    "thirdIntervals": "3m 4P 5P 6M 7M 8P 9M",
-    "fifthIntervals": "5P 6M 7M 8P 9M 10m 11P",
-    "seventhIntervals": "7M 8P 9M 10m 11P 12P 13M"
-  },
-  "minor-pentatonic": {
-    "name": "Minor Pentatonic",
-    "intervals": "1P 3m 4P 5P 7m",
-    "thirdIntervals": "4P 5P 7m 8P 10m",
-    "fifthIntervals": "7m 8P 10m 11P 12P",
-    "seventhIntervals": "10m 11P 12P 14m 15P"
-  },
-  "natural-minor": {
-    "name": "Natural Minor",
-    "intervals": "1P 2M 3m 4P 5P 6m 7m",
-    "thirdIntervals": "3m 4P 5P 6m 7m 8P 9M",
-    "fifthIntervals": "5P 6m 7m 8P 9M 10m 11P",
-    "seventhIntervals": "7m 8P 9M 10m 11P 12P 13m"
-  },
-  "phrygian": {
-    "name": "Phrygian",
-    "intervals": "1P 2m 3m 4P 5P 6m 7m",
-    "thirdIntervals": "3m 4P 5P 6m 7m 8P 9m",
-    "fifthIntervals": "5P 6m 7m 8P 9m 10m 11P",
-    "seventhIntervals": "7m 8P 9m 10m 11P 12P 13m"
-  },
-  "altered": {
-    "name": "Altered",
-    "intervals": "1P 2m 3m 3M 5d 6m 7m",
-    "thirdIntervals": "3m 3M 5d 6m 7m 8P 9m",
-    "fifthIntervals": "5d 6m 7m 8P 9m 10m 10M",
-    "seventhIntervals": "7m 8P 9m 10m 10M 12d 13m"
-  },
-  "blues": {
-    "name": "Blues (Chords)",
-    "intervals": "1P 3m 4P 4A 5P 7m",
-    "thirdIntervals": "3M 5P 6M 6M 7M 9M",
-    "fifthIntervals": "5P 7m 8P 8P 9M 11P",
-    "seventhIntervals": "7m 8A 10m 10m 11P 12A"
-  },
-  "blues-octaves": {
-    "name": "Blues (Scale)",
-    "intervals": "1P 3m 4P 4A 5P 7m",
-    "thirdIntervals": "8P 10m 11P 11A 12P 14m",
-    "fifthIntervals": "15P 17m 18P 18A 19P 21m",
-    "seventhIntervals": "22P 24m 25P 25A 26P 28m"
-  },
-  "kansas-city": {
-    "name": "Kansas City Blues",
-    "intervals": "1P 2M 3m 5P 6M",
-    "thirdIntervals": "3M 4A 5P 7M 8A",
-    "fifthIntervals": "5P 6M 6M 9M 10M",
-    "seventhIntervals": "6A 8P 9A 10A 12P"
-  },
-  "mixolydian-b6": {
-    "name": "Mixolydian b6",
-    "intervals": "1P 2M 3M 4P 5P 6m 7m",
-    "thirdIntervals": "3M 4P 5P 6m 7m 8P 9M",
-    "fifthIntervals": "5P 6m 7m 8P 9M 10M 11P",
-    "seventhIntervals": "7m 8P 9M 10M 11P 12P 13m"
-  },
-  "heptatonic-blues": {
-    "name": "Heptatonic Blues",
-    "intervals": "1P 2M 3m 4P 5d 5P 7m",
-    "thirdIntervals": "3m 4P 5d 5P 7m 8P 9M",
-    "fifthIntervals": "5d 5P 7m 8P 9M 10m 11P",
-    "seventhIntervals": "7m 8P 9M 10m 11P 12d 12P"
-  },
-  "chromatic": {
-    "name": "Chromatic",
-    "intervals": "1P 2m 2M 3m 3M 4P 5d 5P 6m 6M 7m 7M",
-    "thirdIntervals": "3M 4P 5d 5P 6m 6M 7m 7M 8P 9m 9M 10m",
-    "fifthIntervals": "5P 6m 6M 7m 7M 8P 9m 9M 10m 10M 11P 12d",
-    "seventhIntervals": "7m 7M 8P 9m 9M 10m 10M 11P 12d 12P 13m 13M"
-  },
-  "diminished": {
-    "name": "Diminished",
-    "intervals": "1P 2m 3m 3M 4A 5P 6M 7m",
-    "thirdIntervals": "3m 3M 4A 5P 6M 7m 8P 9m",
-    "fifthIntervals": "4A 5P 6M 7m 8P 9m 10m 10M",
-    "seventhIntervals": "6M 7m 8P 9m 10m 10M 11A 12P"
-  },
-  "octatonic": {
-    "name": "Octatonic",
-    "intervals": "1P 2M 3m 4P 5d 5A 6M 7M",
-    "thirdIntervals": "3m 4P 5d 5A 6M 7M 8P 9M",
-    "fifthIntervals": "5d 5A 6M 7M 8P 9M 10m 11P",
-    "seventhIntervals": "6M 7M 8P 9M 10m 11P 12d 12A"
-  },
-  "whole-tone": {
-    "name": "Whole Tone",
-    "intervals": "1P 2M 3M 4A 5A 6A",
-    "thirdIntervals": "3M 4A 5A 6A 8P 9M",
-    "fifthIntervals": "5A 6A 8P 9M 10M 11A",
-    "seventhIntervals": "6A 8P 9M 10M 11A 12A"
-  }
-}
-
-},{}],73:[function(require,module,exports){
-'use strict';
-
-/**
- * Object for doing event sequencing.
- */
-var Timing = function Timing() {
-    /**
-     * Callback function for every animation frame in the timing library
-     */
-    this.onProgress = function () {};
-
-    // Event list: structured identically to our score JSON files
-    this._eventList = new Array();
-
-    // Flattened event list: for lookup by index
-    this._allEvents = new Array();
-
-    // Array of events that are currently active
-    this._currEvents = {};
-
-    // The numeric id that will be attached to the next event. Doubles as a total
-    // count of all events currently in the event list (irrespective of hierarchy)
-    this._currentId = 0;
-
-    // All registered callback functions. Keys are event types, values are objects
-    // of the form {'onStart': myFunction, etc.}
-    this._callbacks = {};
-
-    // The media object that will be synchronized with the playback.
-    this._mediaSync;
-
-    //
-    this._startTime = 0;
-    this._currentTime = 0;
-    this._duration = 0.0;
-
-    // Whether the timing system is currently playing.
-    this._isPlaying = false;
-
-    // Keeps track of which top-level event is next in the list when playing.
-    // The idea here is a slight performance improvement, but there may be better
-    // ways to do this.
-    this._nextEventIndex = 0;
-};
-
-Timing.prototype = {
-    /**
-     * Load events into the timing library event list from a JSON file.
-     * @param  {String}   url      Path to the JSON file that you're trying to load.
-     * @param  {Function} callback Callback function for when the events are loaded. The event list is passed as a parameter to the callback.
-     */
-    loadEvents: function loadEvents(url, callback) {
-        var xmlhttp = new XMLHttpRequest();
-
-        // Wait for progress on the request
-        xmlhttp.onreadystatechange = function (evt) {
-            // Check if the request has gone through
-            if (evt.target.readyState == 4 && evt.target.status == 200) {
-                // Parse the JSON
-                var eventList = JSON.parse(evt.target.responseText);
-
-                this.addEvents(eventList);
-
-                // Fire callback
-                if (callback) {
-                    callback(eventList);
-                }
-            }
-        }.bind(this);
-
-        xmlhttp.open("GET", url, true);
-        xmlhttp.send();
-    },
-
-    /**
-     * Play the timeline from the beginning, or from the point where the timeline
-     * was last paused.
-     */
-    play: function play() {
-        if (this._mediaSync) {
-            this._mediaSync.play();
-        } else {
-            this._startTime = null;
-        }
-
-        this._isPlaying = true;
-        this._nextEventIndex = 0;
-
-        // Start up the requestAnimationFrame loop
-        this._updateTiming();
-    },
-
-    /**
-     * Pause the main timeline.
-     */
-    pause: function pause() {
-        if (!this._isPlaying) {
-            return; // already paused
-        }
-
-        this._isPlaying = false;
-
-        if (this._mediaSync) {
-            this._mediaSync.pause();
-        }
-
-        // Fire ending events for all
-        for (var index in this._currEvents) {
-            this._endEvent(this._currEvents[index]);
-        }
-
-        // Clear our our current events list
-        this._currEvents = [];
-    },
-
-    /**
-     * [function description]
-     * @param  {String} type         The name of the type of event to attach these callbacks to.
-     * @param  {Function} onStart    Callback function for event start. Receives the event object as a parameter.
-     * @param  {Function} onEnd      Callback function for event end. Receives the event object as a parameter.
-     * @param  {Function} onProgress Callback function for each animation frame during an event. Receives the event object,
-     *                               and a progress percentage (from 0 to 1) as parameters.
-     */
-    setEventCallback: function setEventCallback(type, onStart, onEnd, onProgress) {
-        // Attach an empty object to the callbacks of this type.
-        this._callbacks[type] = {};
-
-        if (onStart) {
-            this._callbacks[type]['onStart'] = onStart;
-        }
-
-        if (onEnd) {
-            this._callbacks[type]['onEnd'] = onEnd;
-        }
-
-        if (onProgress) {
-            this._callbacks[type]['onProgress'] = onProgress;
-        }
-    },
-
-    /**
-     * Specify a media object whose playback will be synchronized to the timeline.
-     * @param  {Object} mediaObject Reference to either an audio or video tag that syncs with
-     *                              the timeline.
-     */
-    attachMedia: function attachMedia(mediaObject) {
-        this._mediaSync = mediaObject;
-    },
-
-    setMediaSource: function setMediaSource(src) {
-        if (this._mediaSync) {
-            this._mediaSync.src = src;
-        }
-        // TODO: add this callback so client can use metadata if desired
-        //this._mediaSync.addEventListener('loadedmetadata', function () {
-        //});
-    },
-
-    getMediaSource: function getMediaSource() {
-        return this._mediaSync ? this._mediaSync.src : '';
-    },
-
-    /**
-     * Get a reference to the event with the specified ID number.
-     * @param  {Number} id The ID number of the requested event.
-     * @return {Object}    The relevant event object.
-     */
-    getEventById: function getEventById(id) {
-        return this._allEvents[id];
-    },
-
-    /**
-     * Called every animation frame to check in on the state of the events.
-     * @private
-     */
-    _updateTiming: function _updateTiming(now) {
-        if (!this._mediaSync && now) {
-            if (!this._startTime) {
-                this._startTime = now / 1000;
-            } else {
-                this._currentTime = now / 1000 - this._startTime;
-            }
-        }
-        // TODO: Really, we should be registering event callbacks to check this sort
-        // of thing. For now, this is okay.
-        if (this._mediaSync && this._mediaSync.paused) {
-            this.pause();
-        } else if (this.currentTime > this.duration) {
-            this.pause();
-        } else {
-            this.onProgress();
-
-            // Iterate through all of the current events
-            for (var index in this._currEvents) {
-                var event = this._currEvents[index];
-
-                if (this.currentTime > event['end']) {
-                    // End any events whose time has passed
-                    this._endEvent(event);
-                } else {
-                    // Call the event progress callback
-                    this._progressEvent(event);
-
-                    for (var subIndex in event['events']) {
-                        var subEvent = event['events'][subIndex];
-
-                        if (subEvent['start'] <= this.currentTime && subEvent['end'] > this.currentTime) {
-                            this._startEvent(subEvent);
-                        } else {
-                            //console.log('skipping subEvent ' + subIndex + ': ' + subEvent['start'] + ' - ' + subEvent['end']);
-                        }
-                    }
-                }
-            }
-
-            // Now, look through all of the events and figure out which new events need to be fired
-            for (var index = this._nextEventIndex; index < this._eventList.length; ++index) {
-                var event = this._eventList[index];
-                // Check if the event we're looking at falls within the current time.
-                if (event['start'] <= this.currentTime && event['end'] > this.currentTime) {
-                    // If so, start the event (which will recursively start any appropriate sub-events)
-                    this._startEvent(event);
-
-                    this._nextEventIndex += 1;
-                }
-            }
-
-            window.requestAnimationFrame(this._updateTiming.bind(this));
-        }
-    },
-
-    addEvents: function addEvents(eventList) {
-        for (var i = 0; i < eventList.length; i++) {
-            var event = eventList[i];
-
-            this._eventList.push(event);
-            this._setEventId(event);
-        }
-    },
-
-    clearEvents: function clearEvents() {
-        this.pause();
-
-        this._eventList.length = 0;
-    },
-
-    _setEventId: function _setEventId(event) {
-        event['id'] = this._currentId;
-        this._currentId += 1;
-
-        this._allEvents.push(event);
-
-        for (var index in event['events']) {
-            this._setEventId(event['events'][index]);
-        }
-    },
-
-    _startEvent: function _startEvent(event) {
-        if (this._callbacks[event['type']] && this._callbacks[event['type']].onStart) {
-            this._callbacks[event['type']].onStart(event);
-        }
-
-        this._currEvents[event['id']] = event;
-    },
-
-    _endEvent: function _endEvent(event) {
-        if (this._callbacks[event['type']] && this._callbacks[event['type']].onEnd) {
-            this._callbacks[event['type']].onEnd(event);
-        }
-
-        delete this._currEvents[event['id']];
-    },
-
-    _progressEvent: function _progressEvent(event) {
-        if (this._callbacks[event['type']] && this._callbacks[event['type']].onProgress) {
-            var progress = (this.currentTime - event['start']) / (event['end'] - event['start']);
-
-            this.callbacks[event['type']].onProgress(event, progress);
-        }
-    }
-};
-
-Object.defineProperty(Timing.prototype, 'currentTime', {
-    get: function get() {
-        return this._mediaSync ? this._mediaSync.currentTime : this._currentTime;
-    },
-    set: function set(value) {
-        if (this._mediaSync) {
-            this._mediaSync.currentTime = value;
-        } else {
-            this._currentTime = value;
-        }
-    }
-});
-
-Object.defineProperty(Timing.prototype, 'duration', {
-    get: function get() {
-        return this._mediaSync ? this._mediaSync.duration : this._duration;
-    },
-    set: function set(value) {
-        if (this._mediaSync) {
-            this._mediaSync.duration = value; // TODO: is this legit?
-        } else {
-            this._duration = value;
-        };
-    }
-});
-
-Object.defineProperty(Timing.prototype, 'paused', {
-    get: function get() {
-        return this._mediaSync ? this._mediaSync.paused : !this._isPlaying;
-    }
-});
-
-module.exports = Timing;
-
-},{}],74:[function(require,module,exports){
-"use strict";
-
-var Util = {
-    debounce: function debounce(func, wait, immediate) {
-        var timeout;
-        return function () {
-            var context = this,
-                args = arguments;
-            var later = function later() {
-                timeout = null;
-                if (!immediate) func.apply(context, args);
-            };
-            var callNow = immediate && !timeout;
-            clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
-            if (callNow) func.apply(context, args);
-        };
-    }
-};
-
-module.exports = Util;
-
-},{}]},{},[58]);
+},{"./Button":74,"buffer":51}]},{},[8]);

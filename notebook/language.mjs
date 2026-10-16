@@ -1,3 +1,4 @@
+import {installWorkshopViewport} from './workshop-viewport.mjs';
 // UI translation only. Never rewrites input values, saved titles, musical data or URLs.
 const pairs={
 'Octave':'八度','Live staff notation':'实时五线谱',
@@ -96,3 +97,5 @@ control.addEventListener('keydown',()=>{pointerLanguage=false;});
 control.addEventListener('pointercancel',()=>{pointerLanguage=false;});
 control.addEventListener('click',e=>{const value=e.target.dataset.language;if(!value)return;language=value;try{localStorage.setItem('aqwertyon.language',value);}catch(_){}apply();document.dispatchEvent(new CustomEvent('aq:language',{detail:{language}}));if(pointerLanguage&&priorFocus?.isConnected)priorFocus.focus({preventScroll:true});pointerLanguage=false;});
 apply();
+
+installWorkshopViewport(value=>{language=value;try{localStorage.setItem('aqwertyon.language',value);}catch(_){}apply();document.dispatchEvent(new CustomEvent('aq:language',{detail:{language}}));});

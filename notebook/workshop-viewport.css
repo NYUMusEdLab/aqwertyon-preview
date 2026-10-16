@@ -130,3 +130,36 @@ html.aq-viewport-fit{height:100%;height:var(--aq-viewport-height,100%);overflow:
  .aq-viewport-fit body:has(#melody-notebook[open]) #keyboardContainer .mused-button{min-height:44px}
  .aq-viewport-fit body:has(#melody-notebook[open]) #keyboardContainer .mused-button-row{min-height:48px}
 }
+/* Melody AI: visualization first, choices in a deliberate button panel. */
+.aq-viewport-fit .aq-shell-side:has(.videoBlk[data-play-mode="ai"]){overflow:hidden;display:flex;flex-direction:column}
+.aq-viewport-fit .aq-shell-side:has(.videoBlk[data-play-mode="ai"])>.aq-shell-mode{flex:1;min-height:0}
+.aq-viewport-fit .videoBlk[data-play-mode="ai"]{display:flex;flex-direction:column;min-height:0;height:100%;gap:4px}
+.aq-viewport-fit .videoBlk[data-play-mode="ai"] .duet-panel:not([hidden]){display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;padding:8px;gap:5px}
+.aq-viewport-fit .duet-panel>h3{margin:0;min-height:36px;font-size:17px}
+.aq-viewport-fit .duet-panel>.duet-intro,.aq-viewport-fit .duet-panel>.duet-controls,.aq-viewport-fit .duet-panel>.duet-save-hint,.aq-viewport-fit .duet-panel>.conversation-actions{display:none}
+.aq-viewport-fit .duet-panel>.duet-legend{margin:0;font-size:11px}
+.aq-viewport-fit .duet-panel #duet-roll{flex:1;min-height:80px;height:0;width:100%;max-height:none}
+.aq-viewport-fit .duet-panel #duet-status{flex:none;font-size:11px;line-height:1.3;padding:5px;margin:0}
+.duet-choice-bar{display:flex;gap:5px;flex:none}
+.duet-choice-bar button{min-height:44px;font-size:12px;padding:5px 7px;white-space:nowrap}
+.duet-choice-bar button:first-child{flex:1}
+.duet-choice-dialog{width:min(560px,calc(100vw - 24px));max-height:calc(100dvh - 24px);padding:16px;border:1px solid #a5b6a3;border-radius:16px;background:#fffef9;color:#253930;box-shadow:0 12px 60px #153a3933}
+.duet-choice-dialog::backdrop{background:#183b3b38}
+.duet-choice-dialog:not([open]){display:none!important}
+.duet-choice-close{float:right;min-height:44px}
+.duet-choice-dialog h3{font-size:18px;margin:5px 0 16px}
+.duet-choice-dialog #duet-style-label,.duet-choice-dialog .duet-options>summary{display:none}
+.duet-choice-dialog #duet-style{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px!important}
+.duet-choice-dialog #duet-style button{width:100%!important;white-space:nowrap!important;min-height:44px;font-size:13px!important}
+.duet-choice-dialog .duet-options{margin-top:12px;padding-top:8px}
+.aq-viewport-fit .aq-shell-side:has(.videoBlk[data-play-mode="ai"]) .aq-shell-options{flex:none;padding-top:4px;gap:3px!important}
+.aq-viewport-fit .aq-shell-side:has(.videoBlk[data-play-mode="ai"]) .aq-shell-options label{margin:0;font-size:11px}
+.aq-viewport-fit .aq-shell-side:has(.videoBlk[data-play-mode="ai"]) .sound-status{display:none}
+.duet-choice-dialog .aq-shell-options{display:flex!important;flex-wrap:wrap;gap:12px!important;margin-top:12px!important;padding-top:12px!important;border-top:1px solid #dce0d5}
+.duet-choice-dialog .aq-shell-options>.optionMenu{flex:1;min-width:160px}
+@media(max-width:899px){.aq-viewport-fit .aq-shell-side:has(.videoBlk[data-play-mode="ai"]){flex:0 0 285px;min-height:285px}.aq-viewport-fit .aq-shell-side:has(.videoBlk[data-play-mode="ai"])>.aq-shell-mode{flex-basis:100%}}
+.duet-choice-bar{min-width:0;width:100%}
+.duet-choice-bar button:first-child{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;min-width:0;width:0;white-space:normal;line-height:1.25}
+.duet-choice-bar button:first-child>span:first-child{font-size:10px;color:#536557}
+.duet-choice-bar .current-style{font-size:12px;white-space:nowrap}
+.duet-choice-bar button:last-child{flex:0 0 auto;min-width:52px;padding:5px;font-size:11px}

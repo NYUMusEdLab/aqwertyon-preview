@@ -61430,9 +61430,9 @@ function renderPreview(host, midis, held, root, slug) {
       if (!group.length) return 'continue';
       var notes = group.map(function (m) {
         var n = tonal.note(spell(m, root, slug)),
-            note = new Vex.Flow.StaveNote({ clef: clef, keys: [n.pc + '/' + n.oct], duration: 'q' });note.setStyle({ fillStyle: held.includes(m) ? '#167a70' : '#9eaa98', strokeStyle: held.includes(m) ? '#167a70' : '#9eaa98' });return note;
+            note = new Vex.Flow.StaveNote({ clef: clef, keys: [n.pc + '/' + n.oct], duration: 'q' });if (n.acc) note.addAccidental(0, new Vex.Flow.Accidental(n.acc));note.setStyle({ fillStyle: held.includes(m) ? '#167a70' : '#687a62', strokeStyle: held.includes(m) ? '#167a70' : '#687a62' });return note;
       });
-      var voice = new Vex.Flow.Voice({ num_beats: group.length, beat_value: 4 }).addTickables(notes);voice.setStave(stave);Vex.Flow.Accidental.applyAccidentals([voice], 'C');new Vex.Flow.Formatter().joinVoices([voice]).format([voice], 350);voice.setContext(ctx).draw();
+      var voice = new Vex.Flow.Voice({ num_beats: group.length, beat_value: 4 }).addTickables(notes);voice.setStave(stave);new Vex.Flow.Formatter().joinVoices([voice]).format([voice], 350);voice.setContext(ctx).draw();
     };
 
     for (var _iterator = clefs.entries()[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
@@ -61455,7 +61455,9 @@ function renderPreview(host, midis, held, root, slug) {
     }
   }
 
-  var svg = host.querySelector('svg');svg.setAttribute('viewBox', '0 0 440 ' + height);svg.setAttribute('role', 'img');svg.setAttribute('aria-label', 'Mapped keyboard octave; played notes highlighted');
+  var svg = host.querySelector('svg');var bounds = svg.getBBox(),
+      top = Math.min(0, bounds.y - 12),
+      bottom = Math.max(height, bounds.y + bounds.height + 12);svg.setAttribute('viewBox', '0 ' + top + ' 440 ' + (bottom - top));svg.setAttribute('height', bottom - top);svg.setAttribute('role', 'img');svg.setAttribute('aria-label', 'Mapped keyboard octave; played notes highlighted');
 }
 module.exports = { roots: roots, rootName: rootName, pretty: pretty, spell: spell, scaleNotes: scaleNotes, renderStaff: renderStaff, renderPreview: renderPreview };
 

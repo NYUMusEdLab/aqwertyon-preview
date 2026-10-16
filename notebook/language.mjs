@@ -1,7 +1,7 @@
 import {installWorkshopViewport} from './workshop-viewport.mjs';
 // UI translation only. Never rewrites input values, saved titles, musical data or URLs.
 const pairs={
-'Done':'完成','Video':'视频','AI duet':'AI 合奏',
+'Follow melody':'跟随旋律','AI supplies a motif. Chords are arranged locally; Follow melody fits recent notes at each bar.':'AI 提供动机；和弦由本地规则编配。“跟随旋律”在每小节根据最近演奏的音符选择和弦。','Done':'完成','Video':'视频','AI duet':'AI 合奏',
 'Mapped octave · play to highlight.':'键盘映射音阶 · 演奏时高亮',
 'Octave':'八度','Live staff notation':'实时五线谱',
 'Explore notes':'探索音符','Off':'关闭','Scale wheel':'音阶轮','Staff':'五线谱','Pitch order':'音高排列','Circle of Fifths':'五度圈','Live pitches in the selected scale':'所选音阶的实时音高','Play notes to see their pitches.':'演奏音符以查看音高。',

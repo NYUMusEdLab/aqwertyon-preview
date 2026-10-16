@@ -164,6 +164,7 @@ function init(){
  $('melody-undo').onclick=()=>{if(undoSession){TK.save(undoSession);undoSession=null;removed=null;status('Saved session restored');}else if(removed){TK.restoreCleared(removed);removed=null;status('Saved melodies restored');}$('melody-undo').hidden=true;};
  section.addEventListener('toggle',()=>{if(section.open)render();else if(replayId)stop();});
  window.addEventListener('resize',render);render();
+ let notebookWidth=0;new ResizeObserver(entries=>{const width=Math.floor(entries[0].contentRect.width);if(width>0&&width!==notebookWidth){notebookWidth=width;render();}}).observe($('melody-list'));
  $('melody-newer').onclick=()=>{pageStart=Math.max(0,pageStart-pageSize);render();};
  $('melody-older').onclick=()=>{pageStart+=pageSize;render();};
  $('melody-history').onclick=()=>{const on=section.classList.toggle('show-history');$('melody-history').setAttribute('aria-expanded',String(on));};

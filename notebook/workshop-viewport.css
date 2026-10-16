@@ -163,3 +163,11 @@ html.aq-viewport-fit{height:100%;height:var(--aq-viewport-height,100%);overflow:
 .duet-choice-bar button:first-child>span:first-child{font-size:10px;color:#536557}
 .duet-choice-bar .current-style{font-size:12px;white-space:nowrap}
 .duet-choice-bar button:last-child{flex:0 0 auto;min-width:52px;padding:5px;font-size:11px}
+
+/* One stable, equal-width mode switch at every viewport size. */
+.aq-viewport-fit .duet-mode{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));flex:none;gap:3px;padding:4px;margin:0 0 8px;border:1px solid #d0dacb;border-radius:15px;background:#e4eadf;position:relative;top:auto}
+.aq-viewport-fit .duet-mode button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:0;width:100%;min-height:58px;margin:0;padding:5px 2px;border:1px solid transparent;border-radius:11px;background:transparent;box-shadow:none;color:#536451;font-size:12px;font-weight:600;line-height:1.2;white-space:nowrap;word-break:normal}
+.aq-viewport-fit .duet-mode button svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.aq-viewport-fit .duet-mode button[aria-pressed="true"]{background:var(--aq-paper);color:#244e36;border-color:#a1b494;box-shadow:0 1px 3px #243b3020}
+.aq-viewport-fit .duet-mode button:hover{background:#f4f7ef;color:#244e36}
+.aq-viewport-fit .duet-mode button:focus-visible{outline:2px solid #b65c15;outline-offset:-2px}

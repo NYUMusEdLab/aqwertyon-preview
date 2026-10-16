@@ -157,7 +157,7 @@ html.aq-viewport-fit{height:100%;height:var(--aq-viewport-height,100%);overflow:
 .aq-viewport-fit .aq-shell-side:has(.videoBlk[data-play-mode="ai"]) .sound-status{display:none}
 .duet-choice-dialog .aq-shell-options{display:flex!important;flex-wrap:wrap;gap:12px!important;margin-top:12px!important;padding-top:12px!important;border-top:1px solid #dce0d5}
 .duet-choice-dialog .aq-shell-options>.optionMenu{flex:1;min-width:160px}
-@media(max-width:899px){.aq-viewport-fit .aq-shell-side:has(.videoBlk[data-play-mode="ai"]){flex:0 0 285px;min-height:285px}.aq-viewport-fit .aq-shell-side:has(.videoBlk[data-play-mode="ai"])>.aq-shell-mode{flex-basis:100%}}
+@media(max-width:899px){.aq-viewport-fit .aq-shell-side:has(.videoBlk[data-play-mode="ai"]){flex:0 0 310px;min-height:310px}.aq-viewport-fit .aq-shell-side:has(.videoBlk[data-play-mode="ai"])>.aq-shell-mode{flex-basis:100%}}
 .duet-choice-bar{min-width:0;width:100%}
 .duet-choice-bar button:first-child{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;min-width:0;width:0;white-space:normal;line-height:1.25}
 .duet-choice-bar button:first-child>span:first-child{font-size:10px;color:#536557}

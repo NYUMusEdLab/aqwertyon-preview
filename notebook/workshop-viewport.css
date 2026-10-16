@@ -1,78 +1,78 @@
-/* Embedded workshop presentation only. Existing controls, key nodes and listeners survive. */
-html.aq-workshop-shell{height:100%;overflow:hidden}
-.aq-workshop-shell body{height:100vh;height:100dvh;min-height:0;overflow:hidden;display:flex;flex-direction:column;padding:0;margin:0}
-.aq-workshop-shell body>header{flex:none;min-height:52px;margin:0;padding:4px 10px;gap:6px}
-.aq-workshop-shell header #logo1{height:44px;width:110px}
-.aq-workshop-shell header #logo2{max-width:230px;min-height:44px;font-size:13px}
-.aq-workshop-shell #session{margin-left:auto}
-.aq-workshop-shell #shareURL{width:180px;min-width:80px;max-width:24vw}
-.aq-workshop-shell #main.mainContent{display:grid!important;grid-template-columns:minmax(220px,.55fr) minmax(0,1.8fr)!important;grid-template-rows:minmax(0,1fr);flex:1;min-height:0;max-width:none;width:100%;padding:8px 10px;gap:10px;overflow:hidden;margin:0}
-.aq-workshop-shell #main>.aq-shell-presets{position:fixed;inset:55px 10px auto;z-index:90;margin:0!important}
-.aq-workshop-shell #main>.aq-shell-presets:has(.hidden){display:none!important}
-.aq-workshop-shell .preset-panel{max-height:calc(100vh - 120px);overscroll-behavior:contain}
-.aq-workshop-shell .aq-shell-side{min-height:0;overflow:auto;overscroll-behavior:contain;padding:0 4px 8px 0}
-.aq-workshop-shell .aq-shell-play{min-height:0;display:flex;flex-direction:column;overflow:hidden;gap:8px}
-.aq-workshop-shell #main .aq-shell-side>.row,.aq-workshop-shell #main .aq-shell-play>.row{margin:0!important;width:100%;grid-area:auto!important;flex-wrap:nowrap;gap:6px;min-width:0}
-.aq-workshop-shell .aq-shell-side .videoBlk{width:100%!important;min-width:0;max-height:none}
-.aq-workshop-shell .duet-mode{position:sticky;top:0;z-index:2;background:var(--aq-surface);margin:0;padding:0 0 6px;gap:4px}
-.aq-workshop-shell .duet-mode button{min-height:44px;font-size:12px;padding:6px}
-.aq-workshop-shell .note-explorer{display:block!important;padding:0}
-.aq-workshop-shell .videoBlk:not([data-play-mode="play"])>.note-explorer{display:none!important}
-.aq-workshop-shell .theory-display{min-height:0;height:150px;max-width:260px;margin:0 auto;display:flex}
-.aq-workshop-shell .theory-display>svg{width:auto;height:100%;max-width:100%;max-height:100%}
-.aq-workshop-shell .note-view-help{font-size:12px;margin:4px 0 8px}
-.aq-workshop-shell .duet-panel{max-height:none;overflow:visible;padding:8px}
-.aq-workshop-shell .duet-panel #duet-roll{height:100px}
-.aq-workshop-shell .aq-shell-options{flex-wrap:wrap!important;padding-top:6px}
-.aq-workshop-shell .aq-shell-options>.optionMenu{width:100%;margin:0!important}
-.aq-workshop-shell .aq-shell-options #keyboard-labels{gap:4px}
-.aq-workshop-shell .aq-shell-options #keyboard-labels button{min-height:44px;padding:6px}
-.aq-workshop-shell .aq-shell-scale{flex:none}
-.aq-workshop-shell .aq-shell-scale .scaleContainer{flex:1;min-width:0!important;gap:6px}
-.aq-workshop-shell .aq-shell-scale .optionMenu{min-width:0}
-.aq-workshop-shell #scaleMenu{min-width:0;width:100%}
-.aq-workshop-shell #scaleTypeMenu{min-width:0}
-.aq-workshop-shell #root-picker-container{gap:6px}
-.aq-workshop-shell #root-note-menu{width:70px}
-.aq-workshop-shell #root-octave-menu{width:64px}
-.aq-workshop-shell .aq-shell-keys{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;align-items:center}
-.aq-workshop-shell #keyboardContainer{min-width:0;width:100%;margin:0!important;flex:1}
-.aq-workshop-shell #keyboardContainer .mused-button-row{min-height:48px}
-.aq-workshop-shell #keyboardContainer .mused-button-row:not(:has(.mused-button:not(.disabled))){display:none}
-.aq-workshop-shell #keyboardContainer .mused-button{min-width:44px;min-height:44px;margin:2px;padding:2px 0;border-radius:12px}
-.aq-workshop-shell #keyboardContainer .theory-key{font-size:15px;gap:3px}
-.aq-workshop-shell #keyboardContainer .theory-key::after{font-size:10px}
-.aq-workshop-shell #melody-notebook{position:relative;inset:auto;flex:none;width:100%;max-width:none;margin:0;padding:0 10px;border-top:1px solid var(--aq-line);max-height:180px;max-height:min(28vh,180px);overflow:auto;overscroll-behavior:contain}
-.aq-workshop-shell #melody-notebook>summary{position:sticky;top:0;z-index:2;min-height:44px;align-content:center;font-size:15px}
-.aq-workshop-shell .melody-tray-nav button,.aq-workshop-shell .melody-card button{min-height:44px;font-size:12px}
-.aq-workshop-shell #melody-notebook.show-history #melody-list{display:flex}
-.aq-workshop-shell .notebook-body{padding:4px 0}
-.aq-workshop-shell #melody-list>.melody-card{flex-basis:220px}
+/* Viewport presentation for standalone and workshop use. Existing controls, key nodes and listeners survive. */
+html.aq-viewport-fit{height:100%;height:var(--aq-viewport-height,100%);overflow:hidden;overscroll-behavior:none}
+.aq-viewport-fit body{height:100vh;height:100dvh;height:var(--aq-viewport-height,100vh);position:fixed;inset:0;width:100%;min-height:0;overflow:hidden;display:flex;flex-direction:column;padding:0;margin:0}
+.aq-viewport-fit body>header{flex:none;min-height:52px;margin:0;padding:4px 10px;gap:6px}
+.aq-viewport-fit header #logo1{height:44px;width:110px}
+.aq-viewport-fit header #logo2{max-width:230px;min-height:44px;font-size:13px}
+.aq-viewport-fit #session{margin-left:auto}
+.aq-viewport-fit #shareURL{width:180px;min-width:80px;max-width:24vw}
+.aq-viewport-fit #main.mainContent{display:grid!important;grid-template-columns:minmax(220px,.55fr) minmax(0,1.8fr)!important;grid-template-rows:minmax(0,1fr);flex:1;min-height:0;max-width:none;width:100%;padding:8px 10px;gap:10px;overflow:hidden;margin:0}
+.aq-viewport-fit #main>.aq-shell-presets{position:fixed;inset:55px 10px auto;z-index:90;margin:0!important}
+.aq-viewport-fit #main>.aq-shell-presets:has(.hidden){display:none!important}
+.aq-viewport-fit .preset-panel{max-height:calc(100vh - 120px);overscroll-behavior:contain}
+.aq-viewport-fit .aq-shell-side{min-height:0;overflow:auto;overscroll-behavior:contain;padding:0 4px 8px 0}
+.aq-viewport-fit .aq-shell-play{min-height:0;display:flex;flex-direction:column;overflow:hidden;gap:8px}
+.aq-viewport-fit #main .aq-shell-side>.row,.aq-viewport-fit #main .aq-shell-play>.row{margin:0!important;width:100%;grid-area:auto!important;flex-wrap:nowrap;gap:6px;min-width:0}
+.aq-viewport-fit .aq-shell-side .videoBlk{width:100%!important;min-width:0;max-height:none}
+.aq-viewport-fit .duet-mode{position:sticky;top:0;z-index:2;background:var(--aq-surface);margin:0;padding:0 0 6px;gap:4px}
+.aq-viewport-fit .duet-mode button{min-height:44px;font-size:12px;padding:6px}
+.aq-viewport-fit .note-explorer{display:block!important;padding:0}
+.aq-viewport-fit .videoBlk:not([data-play-mode="play"])>.note-explorer{display:none!important}
+.aq-viewport-fit .theory-display{min-height:0;height:150px;max-width:260px;margin:0 auto;display:flex}
+.aq-viewport-fit .theory-display>svg{width:auto;height:100%;max-width:100%;max-height:100%}
+.aq-viewport-fit .note-view-help{font-size:12px;margin:4px 0 8px}
+.aq-viewport-fit .duet-panel{max-height:none;overflow:visible;padding:8px}
+.aq-viewport-fit .duet-panel #duet-roll{height:100px}
+.aq-viewport-fit .aq-shell-options{flex-wrap:wrap!important;padding-top:6px}
+.aq-viewport-fit .aq-shell-options>.optionMenu{width:100%;margin:0!important}
+.aq-viewport-fit .aq-shell-options #keyboard-labels{gap:4px}
+.aq-viewport-fit .aq-shell-options #keyboard-labels button{min-height:44px;padding:6px}
+.aq-viewport-fit .aq-shell-scale{flex:none}
+.aq-viewport-fit .aq-shell-scale .scaleContainer{flex:1;min-width:0!important;gap:6px}
+.aq-viewport-fit .aq-shell-scale .optionMenu{min-width:0}
+.aq-viewport-fit #scaleMenu{min-width:0;width:100%}
+.aq-viewport-fit #scaleTypeMenu{min-width:0}
+.aq-viewport-fit #root-picker-container{gap:6px}
+.aq-viewport-fit #root-note-menu{width:70px}
+.aq-viewport-fit #root-octave-menu{width:64px}
+.aq-viewport-fit .aq-shell-keys{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;align-items:center}
+.aq-viewport-fit #keyboardContainer{min-width:0;width:100%;margin:0!important;flex:1}
+.aq-viewport-fit #keyboardContainer .mused-button-row{min-height:48px}
+.aq-viewport-fit #keyboardContainer .mused-button-row:not(:has(.mused-button:not(.disabled))){display:none}
+.aq-viewport-fit #keyboardContainer .mused-button{min-width:44px;min-height:44px;margin:2px;padding:2px 0;border-radius:12px}
+.aq-viewport-fit #keyboardContainer .theory-key{font-size:15px;gap:3px}
+.aq-viewport-fit #keyboardContainer .theory-key::after{font-size:10px}
+.aq-viewport-fit #melody-notebook{position:relative;inset:auto;flex:none;width:100%;max-width:none;margin:0;padding:0 10px;border-top:1px solid var(--aq-line);max-height:180px;max-height:min(28vh,180px);overflow:auto;overscroll-behavior:contain}
+.aq-viewport-fit #melody-notebook>summary{position:sticky;top:0;z-index:2;min-height:44px;align-content:center;font-size:15px}
+.aq-viewport-fit .melody-tray-nav button,.aq-viewport-fit .melody-card button{min-height:44px;font-size:12px}
+.aq-viewport-fit #melody-notebook.show-history #melody-list{display:flex}
+.aq-viewport-fit .notebook-body{padding:4px 0}
+.aq-viewport-fit #melody-list>.melody-card{flex-basis:220px}
 @media(max-width:899px){
- .aq-workshop-shell #main.mainContent{display:flex!important;flex-direction:column;padding:6px 8px;gap:6px}
- .aq-workshop-shell .aq-shell-side{flex:0 0 190px;display:flex;gap:12px;overflow:auto}
- .aq-workshop-shell .aq-shell-side>.aq-shell-mode{flex:1 0 55%;min-width:0}
- .aq-workshop-shell .aq-shell-side>.aq-shell-options{flex:1 0 40%;align-content:start}
- .aq-workshop-shell .theory-display{height:140px}
- .aq-workshop-shell .note-view-help{display:none}
- .aq-workshop-shell .aq-shell-play{flex:1;min-height:0}
- .aq-workshop-shell #melody-notebook{max-height:155px}
- .aq-workshop-shell header #logo2{order:0}
- .aq-workshop-shell header #about-credits{order:1}
+ .aq-viewport-fit #main.mainContent{display:flex!important;flex-direction:column;padding:6px 8px;gap:6px}
+ .aq-viewport-fit .aq-shell-side{flex:0 0 190px;display:flex;gap:12px;overflow:auto}
+ .aq-viewport-fit .aq-shell-side>.aq-shell-mode{flex:1 0 55%;min-width:0}
+ .aq-viewport-fit .aq-shell-side>.aq-shell-options{flex:1 0 40%;align-content:start}
+ .aq-viewport-fit .theory-display{height:140px}
+ .aq-viewport-fit .note-view-help{display:none}
+ .aq-viewport-fit .aq-shell-play{flex:1;min-height:0}
+ .aq-viewport-fit #melody-notebook{max-height:155px}
+ .aq-viewport-fit header #logo2{order:0}
+ .aq-viewport-fit header #about-credits{order:1}
 }
 @media(max-width:599px){
- .aq-workshop-shell header #session{width:auto;flex:1;order:3}
- .aq-workshop-shell #shareURL{max-width:none;width:0;flex:1}
- .aq-workshop-shell header #logo2{max-width:calc(100% - 125px)}
- .aq-workshop-shell .aq-shell-side{flex-basis:100px}
- .aq-workshop-shell .aq-shell-side>.aq-shell-mode{flex-basis:100%}
- .aq-workshop-shell .aq-shell-side>.aq-shell-options{flex-basis:85%}
- .aq-workshop-shell .aq-shell-scale{flex-wrap:wrap!important;max-height:116px;overflow:auto}
- .aq-workshop-shell .aq-shell-keys{align-items:center}
- .aq-workshop-shell #keyboardContainer{min-width:700px}
- .aq-workshop-shell #melody-notebook{max-height:110px}
+ .aq-viewport-fit header #session{width:auto;flex:1;order:3}
+ .aq-viewport-fit #shareURL{max-width:none;width:0;flex:1}
+ .aq-viewport-fit header #logo2{max-width:calc(100% - 125px)}
+ .aq-viewport-fit .aq-shell-side{flex-basis:100px}
+ .aq-viewport-fit .aq-shell-side>.aq-shell-mode{flex-basis:100%}
+ .aq-viewport-fit .aq-shell-side>.aq-shell-options{flex-basis:85%}
+ .aq-viewport-fit .aq-shell-scale{flex-wrap:wrap!important;max-height:116px;overflow:auto}
+ .aq-viewport-fit .aq-shell-keys{align-items:center}
+ .aq-viewport-fit #keyboardContainer{min-width:700px}
+ .aq-viewport-fit #melody-notebook{max-height:110px}
 }
 /* Closed native details must leave sticky layout before its frame resizes. */
-.aq-workshop-shell #melody-notebook:not([open])>summary{position:static}
+.aq-viewport-fit #melody-notebook:not([open])>summary{position:static}
 /* The credits popup starts below the complete, possibly wrapped header. */
-.aq-workshop-shell #about-credits .credits-content{top:var(--aq-shell-header-height,110px);max-height:calc(100vh - var(--aq-shell-header-height,110px) - 12px)}
+.aq-viewport-fit #about-credits .credits-content{top:var(--aq-shell-header-height,110px);max-height:calc(100vh - var(--aq-shell-header-height,110px) - 12px)}

@@ -243,3 +243,5 @@ header #session{gap:8px;font-size:14px;line-height:1.2;min-width:0}header #share
 .aq-viewport-fit .aq-shell-play>.sound-status{display:flex;max-width:none;margin:0;min-height:20px}
 .aq-viewport-fit .aq-shell-play>.sound-status[data-state="idle"]{display:none}
 .videoBlk .video-status{font-size:12px}
+
+.staff-held-notes{display:block;text-align:center;min-height:26px;font-size:18px;font-weight:700;line-height:26px;color:#006b75;letter-spacing:.03em}

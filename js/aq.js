@@ -61508,7 +61508,7 @@ function renderPreview(host, midis, held, root, slug) {
       if (!group.length) return 'continue';
       var notes = group.map(function (m) {
         var n = tonal.note(spell(m, root, slug)),
-            note = new Vex.Flow.StaveNote({ clef: clef, keys: [n.pc + '/' + n.oct], duration: 'q' });if (n.acc) note.addAccidental(0, new Vex.Flow.Accidental(n.acc));note.setStyle({ fillStyle: held.includes(m) ? '#003f46' : '#84907f', strokeStyle: held.includes(m) ? '#003f46' : '#84907f' });return note;
+            note = new Vex.Flow.StaveNote({ clef: clef, keys: [n.pc + '/' + n.oct], duration: 'q' });if (n.acc) note.addAccidental(0, new Vex.Flow.Accidental(n.acc));note.setStyle({ fillStyle: held.includes(m) ? '#000000' : '#84907f', strokeStyle: held.includes(m) ? '#000000' : '#84907f' });return note;
       });
       var voice = new Vex.Flow.Voice({ num_beats: group.length, beat_value: 4 }).addTickables(notes);voice.setStave(stave);new Vex.Flow.Formatter().joinVoices([voice]).format([voice], 350);voice.setContext(ctx).draw();
       // A filled halo makes the held state distinct by shape as well as color.

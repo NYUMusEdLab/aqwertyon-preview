@@ -10,7 +10,7 @@ export function initNoteViews(app){
   const root=app.keyboard.mapping.root,slug=app.scalePicker.scale,base=root+app.keyboard.mapping.transposition;
   const mapped=[...new Set(buttons.map(b=>b.eventData))].sort((a,b)=>a-b).filter(m=>m>=base&&m<=base+12);
   const shown=[...new Set([...mapped,...held])].sort((a,b)=>a-b);
-  const key=JSON.stringify([held,root,slug,shown]);if(key===signature)return;signature=key;
+  const key=JSON.stringify([held,root,slug,shown,app.rootPicker.spelling]);if(key===signature)return;signature=key;
   const names=held.map(m=>window.aqTheory.spell(m,root,slug));host.dataset.notes=names.join(' ');panel.querySelector('.staff-held-notes').textContent=names.map(n=>n.replace(/#/g,'♯').replace(/b/g,'♭')).join(' · ');host.dataset.view='staff';
   host.dataset.mapped=mapped.join(',');window.aqTheory.renderPreview(host,shown,held,root,slug);panel.querySelector('.staff-scale-label').textContent=host.dataset.scaleLabel;
  }

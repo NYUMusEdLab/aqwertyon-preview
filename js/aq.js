@@ -58174,6 +58174,7 @@ window.appInfo = {
             configure: { type: 'bool', inTemplate: false, urlParam: 'configure', inUI: false, default: false },
             scoreSlug: { type: 'string', inTemplate: true, urlParam: 'score', inUI: false },
             scaleSlug: { type: 'string', inTemplate: true, urlParam: 'scale', inUI: true, default: useCMSDDefault ? 'major-pentatonic' : 'minor-pentatonic' },
+            rootSpelling: { type: 'string', inTemplate: true, urlParam: 'spelling', inUI: true, default: '' },
             midiRoot: { type: 'int', inTemplate: true, urlParam: 'root', inUI: true, default: rootDefault },
             videoSlug: { type: 'string', inTemplate: true, urlParam: 'video', inUI: true, default: videoDefault },
             soundSlug: { type: 'string', inTemplate: true, urlParam: 'sound', inUI: true, default: soundDefault },
@@ -58456,7 +58457,7 @@ var Aqwertyon = function (_MusED$AppBase) {
             var target = this.options;for (var i = 0; i < option.length - 1; i++) {
                 target = target[option[i]];
             }target[option[option.length - 1]] = value;
-            this.configManager.updateURLOption(option, value);
+            this.configManager.updateURLOption(option, option[0] === 'rootSpelling' ? encodeURIComponent(value) : value);
             this.updateShare();
 
             this.sessionManager.saveOption(option, value);
@@ -58638,7 +58639,9 @@ var Aqwertyon = function (_MusED$AppBase) {
             var features = this.options.features;
 
             // ROOT
+            this.rootPicker.spelling = this.options.rootSpelling;
             this.rootPicker.root = this.options.midiRoot;
+            this.options.rootSpelling = this.rootPicker.spelling;
 
             // SCALE
             this.scalePicker.scale = this.options.scaleSlug;
@@ -58663,7 +58666,7 @@ var Aqwertyon = function (_MusED$AppBase) {
             this.scoreImage.toggleVisibility(features.showScore);
 
             // Share the selected musical configuration, not just its sound/video.
-            ['midiRoot', 'scaleSlug', 'soundSlug', 'videoSlug', 'volume'].forEach(function (k) {
+            ['rootSpelling', 'midiRoot', 'scaleSlug', 'soundSlug', 'videoSlug', 'volume'].forEach(function (k) {
                 return _this3.logUpdatedOption(k, _this3.options[k]);
             });
             ['layout', 'useNoteCaps', 'labelMode'].forEach(function (k) {
@@ -60265,8 +60268,8 @@ var RootPicker = function () {
         var wrap = document.createElement('div');wrap.className = 'optionMenu';var label = document.createElement('label');label.textContent = name;label.htmlFor = id;var select = document.createElement('select');select.id = id;wrap.append(label, select);_this.pickerContainer.append(wrap);return select;
       };
       this.rootMenu = control('Root', 'root-note-menu');this.octaveMenu = control('Octave', 'root-octave-menu');
-      Theory.roots.forEach(function (n, i) {
-        var o = document.createElement('option');o.value = i;o.textContent = Theory.pretty(n);_this.rootMenu.append(o);
+      Theory.rootChoices.forEach(function (n, i) {
+        var o = document.createElement('option');o.value = n;o.textContent = Theory.pretty(n);_this.rootMenu.append(o);
       });
       for (var i = -1; i <= 9; i++) {
         var o = document.createElement('option');o.value = i;o.textContent = i;this.octaveMenu.append(o);
@@ -60277,11 +60280,12 @@ var RootPicker = function () {
         });s.addEventListener('keydown', function () {
           pointer = false;
         });s.addEventListener('change', function () {
-          var value = (Number(_this.octaveMenu.value) + 1) * 12 + Number(_this.rootMenu.value);if (value > 127) {
+          var spelling = _this.rootMenu.value,
+              value = Theory.rootMidi(spelling, Number(_this.octaveMenu.value));if (!Number.isInteger(value) || value < 0 || value > 127) {
             _this.root = _this._root;return;
           }
           // Restore notebook's temporary settings before applying the selected root.
-          if (window.aqNotebook) window.aqNotebook.stop();_this._parent.releaseNotes();_this.root = value;_this._parent.logUpdatedOption('midiRoot', value);_this._parent.sessionManager.logEvent('root', value);
+          if (window.aqNotebook) window.aqNotebook.stop();_this._parent.releaseNotes();_this.spelling = spelling;_this.root = value;_this._parent.logUpdatedOption('rootSpelling', spelling);_this._parent.logUpdatedOption('midiRoot', value);_this._parent.sessionManager.logEvent('root', value);
           if (pointer) {
             _this._parent.keyboard.keyboardContainer.focus({ preventScroll: true });_this._parent.keyboard.buttons.activate();
           }pointer = false;
@@ -60299,13 +60303,26 @@ var RootPicker = function () {
       return this.pickerContainer;
     }
   }, {
+    key: 'spelling',
+    get: function get() {
+      return this._spelling || Theory.roots[this._root % 12];
+    },
+    set: function set(value) {
+      try {
+        value = decodeURIComponent(value || '');
+      } catch (e) {
+        value = '';
+      }this._spelling = Theory.rootChoices.includes(value) ? value : '';Theory.setRootSpelling(this._spelling);
+    }
+  }, {
     key: 'root',
     get: function get() {
       return this._root;
     },
     set: function set(value) {
-      if (!Number.isInteger(value) || value < 0 || value > 127) return;this._root = value;this.keyMapper.root = value;if (this.rootMenu) {
-        this.rootMenu.value = String(value % 12);this.octaveMenu.value = String(Math.floor(value / 12) - 1);
+      if (!Number.isInteger(value) || value < 0 || value > 127) return;this._root = value;Theory.setRootSpelling(this._spelling);var name = Theory.rootName(value),
+          pitch = name.replace(/-?\d+$/, '');this._spelling = pitch;Theory.setRootSpelling(pitch);this.keyMapper.root = value;if (this.rootMenu) {
+        this.rootMenu.value = pitch;this.octaveMenu.value = name.slice(pitch.length);
       }
     }
   }]);
@@ -61434,8 +61451,19 @@ var roots = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
 var pretty = function pretty(n) {
   return n.replace(/#/g, '♯').replace(/b/g, '♭');
 };
+var rootChoices = ['C', 'C#', 'Db', 'D', 'D#', 'Eb', 'E', 'Fb', 'E#', 'F', 'F#', 'Gb', 'G', 'G#', 'Ab', 'A', 'A#', 'Bb', 'B', 'Cb', 'B#'];
+var selectedRoot = '';
+function setRootSpelling(name) {
+  selectedRoot = rootChoices.includes(name) ? name : '';
+}
+function rootMidi(name, octave) {
+  return tonal.note(name + octave).midi;
+}
 function rootName(midi) {
-  return roots[(midi % 12 + 12) % 12] + (Math.floor(midi / 12) - 1);
+  var pc = (midi % 12 + 12) % 12,
+      name = selectedRoot && tonal.note(selectedRoot).chroma === pc ? selectedRoot : roots[pc];for (var o = -2; o <= 10; o++) {
+    if (rootMidi(name, o) === midi) return name + o;
+  }return roots[pc] + (Math.floor(midi / 12) - 1);
 }
 function scaleNotes(root, slug) {
   var s = scales[slug];return s ? s.intervals.split(' ').map(function (i) {
@@ -61558,7 +61586,7 @@ function renderPreview(host, midis, held, root, slug) {
       top = Math.min(0, bounds.y - 12),
       bottom = Math.max(height, bounds.y + bounds.height + 12);svg.setAttribute('viewBox', '0 ' + top + ' 440 ' + (bottom - top));svg.setAttribute('height', bottom - top);svg.setAttribute('role', 'img');svg.setAttribute('aria-label', 'Mapped keyboard octave; played notes highlighted');
 }
-module.exports = { notationKey: notationKey, roots: roots, rootName: rootName, pretty: pretty, spell: spell, scaleNotes: scaleNotes, renderStaff: renderStaff, renderPreview: renderPreview };
+module.exports = { rootChoices: rootChoices, setRootSpelling: setRootSpelling, rootMidi: rootMidi, notationKey: notationKey, roots: roots, rootName: rootName, pretty: pretty, spell: spell, scaleNotes: scaleNotes, renderStaff: renderStaff, renderPreview: renderPreview };
 
 },{"./scales.json":73,"@tonaljs/tonal":21,"vexflow/releases/vexflow-debug":42}],73:[function(require,module,exports){
 module.exports={

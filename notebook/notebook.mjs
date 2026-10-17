@@ -13,7 +13,7 @@ const tool='aqwertyon-preview';
 const status=text=>{$('melody-status').textContent=text;};
 const label=m=>['C','C♯','D','E♭','E','F','F♯','G','A♭','A','B♭','B'][m%12]+(Math.floor(m/12)-1);
 const pitches=events=>[...new Set(events.map(e=>e.midi))].sort((a,b)=>a-b);
-const cfg=()=>({captureMode:conversation?.active()?'ai':(app.video.container.dataset.playMode==='video'?'video':'play'),soundSlug:app.audioControls.sounds._requestedInstrument||app.options.soundSlug,scaleSlug:app.options.scaleSlug,midiRoot:app.keyboard.mapping.root,layout:app.options.features.layout,transposition:app.keyboard.mapping.transposition,volume:app.options.volume});
+const cfg=()=>({rootSpelling:app.rootPicker.spelling,captureMode:conversation?.active()?'ai':(app.video.container.dataset.playMode==='video'?'video':'play'),soundSlug:app.audioControls.sounds._requestedInstrument||app.options.soundSlug,scaleSlug:app.options.scaleSlug,midiRoot:app.keyboard.mapping.root,layout:app.options.features.layout,transposition:app.keyboard.mapping.transposition,volume:app.options.volume});
 function currentEvents(){const c=recorder.current();return c?c.events.concat([...c.held].map(([code,midi])=>({type:'off',code,midi,t:performance.now()-c.t0}))):[];}
 function drawLive(){const events=currentEvents();TK.drawRoll($('melody-live'),events,{pitches:pitches(events),labels:label});if(recorder.active())liveFrame=requestAnimationFrame(drawLive);}
 function storage(){ $('melody-storage').textContent=TK.storageAvailable()?'Saved in this browser · newest 60 melodies · Export for a backup':'Browser storage unavailable · kept for this visit only · Export for a backup';}
@@ -72,7 +72,7 @@ function stop(){
  generation++;replay.stop(true);liveDuet=false;playingTake=null;for(const n of conversationVoices.values())n.stop();conversationVoices.clear();replayCounts.clear();replayKeys.clear();pitchKeys.clear();lastKey=null;replayLights();replayId=null;
  if(previous){
   app.audioControls.switchSound(previous.sound,'soundfont');
-  app.rootPicker.root=previous.root;app.scalePicker.scale=previous.scale;
+  app.rootPicker.spelling=previous.rootSpelling;app.rootPicker.root=previous.root;app.scalePicker.scale=previous.scale;
   app.keyboard.mapping.layout=previous.layout;app.keyboard.mapping.transposition=previous.transposition;
   if(app.video.ready){app.video.player.pauseVideo();if(!previous.withVideo)app.video.player.seekTo(previous.time||0,true);}
   previous=null;
@@ -87,8 +87,9 @@ async function play(take,withVideo,fromDuet=false){
  document.dispatchEvent(new CustomEvent('aq:replay-start',{detail:{id:take.id,kind:take.kind}}));
  app.releaseNotes();recorder.finish('replay');stop();const run=++generation;
  replayId=take.id;status('Loading melody sound…');render();
- previous={root:app.keyboard.mapping.root,scale:app.scalePicker.scale,layout:app.options.features.layout,transposition:app.keyboard.mapping.transposition,sound:app.options.soundSlug,time:app.video.ready?app.video.player.getCurrentTime():0,playing:app.video.ready&&app.video.player.getPlayerState()===1,withVideo};
+ previous={rootSpelling:app.rootPicker.spelling,root:app.keyboard.mapping.root,scale:app.scalePicker.scale,layout:app.options.features.layout,transposition:app.keyboard.mapping.transposition,sound:app.options.soundSlug,time:app.video.ready?app.video.player.getCurrentTime():0,playing:app.video.ready&&app.video.player.getPlayerState()===1,withVideo};
  if(app.video.ready)app.video.player.pauseVideo();
+ app.rootPicker.spelling=take.cfg?.rootSpelling||'';
  app.rootPicker.root=Number.isInteger(take.cfg?.midiRoot)&&take.cfg.midiRoot>=0&&take.cfg.midiRoot<=127?take.cfg.midiRoot:previous.root;
  app.scalePicker.scale=app.scalePicker.isValidScale(take.cfg?.scaleSlug)?take.cfg.scaleSlug:previous.scale;
  app.keyboard.mapping.layout=/^(1|3|5|7|8|10|12|14|x)(-(1|3|5|7|8|10|12|14|x)){3}$/.test(take.cfg?.layout)?take.cfg.layout:previous.layout;

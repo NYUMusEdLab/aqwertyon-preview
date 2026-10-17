@@ -61452,17 +61452,29 @@ function spell(midi, root, slug) {
     if (tonal.note(chosen + oct).midi === midi) return chosen + oct;
   }return rootName(midi);
 }
+// Conventional signatures for diatonic families; other scales use explicit accidentals.
+function notationKey(root, slug) {
+  var tonic = tonal.note(rootName(root)).pc;
+  var relatives = { major: '1P', 'major-pentatonic': '1P', dorian: '-2M', phrygian: '-3M', lydian: '-4P', mixolydian: '-5P', minor: '-6M', aeolian: '-6M', 'natural-minor': '-6M', 'minor-pentatonic': '-6M', 'harmonic-minor': '-6M', 'melodic-minor': '-6M', locrian: '-7M', 'harmonic-major': '1P' };
+  var candidate = relatives[slug] ? tonal.transpose(tonic, relatives[slug]) : 'C';
+  var key = ['Cb', 'Gb', 'Db', 'Ab', 'Eb', 'Bb', 'F', 'C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#'].includes(candidate) ? candidate : 'C';
+  var alterations = {};var _arr = ['1P', '2M', '3M', '4P', '5P', '6M', '7M'];
+  for (var _i = 0; _i < _arr.length; _i++) {
+    var interval = _arr[_i];var n = tonal.note(tonal.transpose(key, interval));alterations[n.letter] = n.acc || '';
+  }
+  return { key: key, alterations: alterations, label: pretty(tonic) + ' · ' + (scales[slug] && scales[slug].name || slug) };
+}
 function renderStaff(host, notes) {
   host.innerHTML = '';var renderer = new Vex.Flow.Renderer(host, Vex.Flow.Renderer.Backends.SVG);renderer.resize(360, 260);var context = renderer.getContext();
   var treble = new Vex.Flow.Stave(12, 30, 335).addClef('treble'),
       bass = new Vex.Flow.Stave(12, 135, 335).addClef('bass');
   treble.setContext(context).draw();bass.setContext(context).draw();var start = Math.max(treble.getNoteStartX(), bass.getNoteStartX());treble.setNoteStartX(start);bass.setNoteStartX(start);
-  var _arr = [['treble', treble], ['bass', bass]];
+  var _arr2 = [['treble', treble], ['bass', bass]];
 
   var _loop = function _loop() {
-    var _arr$_i = _slicedToArray(_arr[_i], 2),
-        clef = _arr$_i[0],
-        stave = _arr$_i[1];
+    var _arr2$_i = _slicedToArray(_arr2[_i2], 2),
+        clef = _arr2$_i[0],
+        stave = _arr2$_i[1];
 
     var keys = notes.filter(function (n) {
       return tonal.note(n).midi >= 60 === (clef === 'treble');
@@ -61476,7 +61488,7 @@ function renderStaff(host, notes) {
         voice = new Vex.Flow.Voice({ num_beats: 4, beat_value: 4 }).addTickables([chord]);voice.setStave(stave);Vex.Flow.Accidental.applyAccidentals([voice], 'C');new Vex.Flow.Formatter().joinVoices([voice]).format([voice], 240);voice.setContext(context).draw();
   };
 
-  for (var _i = 0; _i < _arr.length; _i++) {
+  for (var _i2 = 0; _i2 < _arr2.length; _i2++) {
     var _ret = _loop();
 
     if (_ret === 'continue') continue;
@@ -61484,7 +61496,8 @@ function renderStaff(host, notes) {
   var svg = host.querySelector('svg');svg.setAttribute('viewBox', '0 0 360 260');svg.setAttribute('role', 'img');svg.setAttribute('aria-label', 'Live staff notation');
 }
 function renderPreview(host, midis, held, root, slug) {
-  host.innerHTML = '';var clefs = ['treble', 'bass'].filter(function (c) {
+  host.innerHTML = '';var signature = notationKey(root, slug),
+      drawnAccidentals = [];host.dataset.keySignature = signature.key;host.dataset.scaleLabel = signature.label;var clefs = ['treble', 'bass'].filter(function (c) {
     return midis.some(function (m) {
       return m >= 60 === (c === 'treble');
     });
@@ -61501,16 +61514,19 @@ function renderPreview(host, midis, held, root, slug) {
           clef = _step$value[1];
 
       var y = i * 100;
-      var stave = new Vex.Flow.Stave(8, y, 424).addClef(clef);stave.setContext(ctx).draw();
+      var stave = new Vex.Flow.Stave(8, y, 424).addClef(clef).addKeySignature(signature.key);stave.setContext(ctx).draw();
       var group = midis.filter(function (m) {
         return m >= 60 === (clef === 'treble');
       });
       if (!group.length) return 'continue';
-      var notes = group.map(function (m) {
+      var accidentalState = new Map();var notes = group.map(function (m) {
         var n = tonal.note(spell(m, root, slug)),
-            note = new Vex.Flow.StaveNote({ clef: clef, keys: [n.pc + '/' + n.oct], duration: 'q' });if (n.acc) note.addAccidental(0, new Vex.Flow.Accidental(n.acc));note.setStyle({ fillStyle: held.includes(m) ? '#000000' : '#84907f', strokeStyle: held.includes(m) ? '#000000' : '#84907f' });return note;
+            note = new Vex.Flow.StaveNote({ clef: clef, keys: [n.pc + '/' + n.oct], duration: 'q' });var pitchKey = n.letter + n.oct,
+            expected = accidentalState.has(pitchKey) ? accidentalState.get(pitchKey) : signature.alterations[n.letter];if ((n.acc || '') !== expected) {
+          note.addAccidental(0, new Vex.Flow.Accidental(n.acc || 'n'));drawnAccidentals.push({ midi: m, accidental: n.acc || 'n' });
+        }accidentalState.set(pitchKey, n.acc || '');note.setStyle({ fillStyle: held.includes(m) ? '#000000' : '#84907f', strokeStyle: held.includes(m) ? '#000000' : '#84907f' });return note;
       });
-      var voice = new Vex.Flow.Voice({ num_beats: group.length, beat_value: 4 }).addTickables(notes);voice.setStave(stave);new Vex.Flow.Formatter().joinVoices([voice]).format([voice], 350);voice.setContext(ctx).draw();
+      var voice = new Vex.Flow.Voice({ num_beats: group.length, beat_value: 4 }).addTickables(notes);voice.setStave(stave);new Vex.Flow.Formatter().joinVoices([voice]).format([voice], Math.max(180, 420 - stave.getNoteStartX()));voice.setContext(ctx).draw();
       // A filled halo makes the held state distinct by shape as well as color.
       var svg = host.querySelector('svg');
       notes.forEach(function (note, j) {
@@ -61538,11 +61554,11 @@ function renderPreview(host, midis, held, root, slug) {
     }
   }
 
-  var svg = host.querySelector('svg');var bounds = svg.getBBox(),
+  host.dataset.accidentals = JSON.stringify(drawnAccidentals);var svg = host.querySelector('svg');var bounds = svg.getBBox(),
       top = Math.min(0, bounds.y - 12),
       bottom = Math.max(height, bounds.y + bounds.height + 12);svg.setAttribute('viewBox', '0 ' + top + ' 440 ' + (bottom - top));svg.setAttribute('height', bottom - top);svg.setAttribute('role', 'img');svg.setAttribute('aria-label', 'Mapped keyboard octave; played notes highlighted');
 }
-module.exports = { roots: roots, rootName: rootName, pretty: pretty, spell: spell, scaleNotes: scaleNotes, renderStaff: renderStaff, renderPreview: renderPreview };
+module.exports = { notationKey: notationKey, roots: roots, rootName: rootName, pretty: pretty, spell: spell, scaleNotes: scaleNotes, renderStaff: renderStaff, renderPreview: renderPreview };
 
 },{"./scales.json":73,"@tonaljs/tonal":21,"vexflow/releases/vexflow-debug":42}],73:[function(require,module,exports){
 module.exports={

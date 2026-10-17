@@ -245,3 +245,5 @@ header #session{gap:8px;font-size:14px;line-height:1.2;min-width:0}header #share
 .videoBlk .video-status{font-size:12px}
 
 .staff-held-notes{display:block;text-align:center;min-height:26px;font-size:18px;font-weight:700;line-height:26px;color:#006b75;letter-spacing:.03em}
+
+.staff-scale-label{text-align:center;font-size:13px;font-weight:600;line-height:20px;color:var(--aq-ink)}

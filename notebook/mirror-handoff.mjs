@@ -1,5 +1,5 @@
 import {digitalPerformance} from './digital-performance.mjs';
-const target='https://ruthmann.github.io/rengongfu-sandbox/workbench/tools/singing-capture/digital.html';
+const target='https://ruthmann.github.io/rengongfu-sandbox/workbench/tools/singing-capture/';
 export function openPerformanceMirror(take,status){
  let payload;try{payload=digitalPerformance(take);}catch(e){status(e.message);return;}
  const nonce=crypto.randomUUID(),url=new URL(target);url.searchParams.set('import','aqwertyon');url.searchParams.set('lang',document.documentElement.lang.startsWith('zh')?'zh':'en');url.hash=nonce;

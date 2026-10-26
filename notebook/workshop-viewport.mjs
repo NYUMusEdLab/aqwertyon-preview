@@ -23,6 +23,7 @@ export function installWorkshopViewport(setLanguage){
   side.append(rows[1],rows[4]);play.append(rows[2],rows[3]);
   const soundStatus=side.querySelector('.sound-status');if(soundStatus)play.prepend(soundStatus);
   main.append(side,play);
+  for(const button of Object.values(window.appInfo?.app?.keyboard?.buttons?._buttonsByName||{})){if(button.eventType==='transpose')button.classList.add('transpose-key');}
   document.documentElement.classList.add('aq-viewport-fit');
   arranged=true;
   const fit=()=>{const v=window.visualViewport;const height=v&&v.scale===1?Math.min(innerHeight,v.height):innerHeight;document.documentElement.style.setProperty('--aq-viewport-height',Math.floor(height)+'px');};

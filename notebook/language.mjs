@@ -1,7 +1,7 @@
 import {installWorkshopViewport} from './workshop-viewport.mjs';
 // UI translation only. Never rewrites input values, saved titles, musical data or URLs.
 const pairs={
-'Open in Performance Mirror':'在演奏镜中打开','Mirror ↗':'演奏镜 ↗',
+'Open in Mirror':'在演奏镜中打开','Open in Performance Mirror':'在演奏镜中打开',
 'Opening Performance Mirror…':'正在打开演奏镜……',
 'Opened in Performance Mirror. Your original remains here.':'已在演奏镜中打开，原始演奏仍保存在此处。',
 'Allow a new tab to open Performance Mirror, then try again.':'请允许打开新标签页，然后重试。',

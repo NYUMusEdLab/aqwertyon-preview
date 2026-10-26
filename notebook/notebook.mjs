@@ -24,7 +24,7 @@ function render(){
  host.replaceChildren();const list=TK.list(tool).flatMap(t=>conversationChunks(t));if(list[0]?.id!==renderedFirst)pageStart=0;renderedFirst=list[0]?.id;$('melody-count').textContent=list.length;
  $('melody-export').disabled=!list.length;$('melody-clear').disabled=!list.length;
  if(!list.length){const p=document.createElement('p');p.textContent='Play two or more notes over at least 0.8 seconds. After you release the keys and pause for 2.5 seconds, your melody appears here.';host.append(p);}
- pageSize=Math.max(1,Math.floor((host.clientWidth||innerWidth)/290));pageStart=Math.min(pageStart,Math.max(0,Math.floor((list.length-1)/pageSize)*pageSize));
+ pageSize=Math.max(1,Math.floor((host.clientWidth||innerWidth)/360));pageStart=Math.min(pageStart,Math.max(0,Math.floor((list.length-1)/pageSize)*pageSize));
  $('melody-newer').disabled=pageStart===0;$('melody-older').disabled=pageStart+pageSize>=list.length;
  host.style.setProperty('--take-columns',pageSize);
  for(const take of list.slice(pageStart,pageStart+pageSize)){
@@ -40,7 +40,7 @@ function render(){
   const button=(text,fn)=>{const b=document.createElement('button');b.type='button';b.textContent=text;b.onclick=fn;controls.append(b);return b;};
   if(replayId===take.id)button('Stop',()=>stop());
   else {button(take.kind==='conversation'?'Replay conversation':'Replay melody',()=>play(take,false));if(take.media?.id)button('With video',()=>play(take,true));}
-  {const mirror=button('Mirror ↗',()=>openPerformanceMirror(take,status));mirror.title='Open in Performance Mirror';mirror.setAttribute('aria-label','Open in Performance Mirror');}
+  {const mirror=button('Open in Mirror',()=>openPerformanceMirror(take,status));mirror.title='Open in Mirror';mirror.setAttribute('aria-label','Open in Mirror');}
   button('Delete',()=>{if(replayId===take.id)stop();undoSession=null;const original=TK.get(take._parentId||take.id);removed=[original||take];if(conversation.snapshot()?.id===(take._parentId||take.id))detachConversation();$('melody-undo').textContent='Undo delete';if(take._sessions>1&&original){undoSession=original;const remaining={...original,events:original.events.filter(e=>e.t<take._offset||e.t>take._end)};TK.save(remaining);}else TK.remove(take._parentId||take.id);$('melody-undo').hidden=false;});
   card.append(title,info,canvas,controls);host.append(card);requestAnimationFrame(()=>TK.drawRoll(canvas,take.events,{pitches:pitches(take.events),labels:label,duration:take.duration,barFor:(m,b)=>b.voice==='ai'?'#c48527':b.voice==='human'?'#008f98':'#b4442c'}));
  }

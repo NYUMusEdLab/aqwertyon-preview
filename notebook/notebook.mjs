@@ -1,4 +1,5 @@
 import './language.mjs';
+import {openPerformanceMirror} from './mirror-handoff.mjs';
 import {conversationChunks} from './conversation-chunks.mjs';
 import {createConversation} from './conversation.mjs';
 import * as TK from './takes.mjs';
@@ -13,7 +14,7 @@ const tool='aqwertyon-preview';
 const status=text=>{$('melody-status').textContent=text;};
 const label=m=>['C','C♯','D','E♭','E','F','F♯','G','A♭','A','B♭','B'][m%12]+(Math.floor(m/12)-1);
 const pitches=events=>[...new Set(events.map(e=>e.midi))].sort((a,b)=>a-b);
-const cfg=()=>({rootSpelling:app.rootPicker.spelling,captureMode:conversation?.active()?'ai':(app.video.container.dataset.playMode==='video'?'video':'play'),soundSlug:app.audioControls.sounds._requestedInstrument||app.options.soundSlug,scaleSlug:app.options.scaleSlug,midiRoot:app.keyboard.mapping.root,layout:app.options.features.layout,transposition:app.keyboard.mapping.transposition,volume:app.options.volume});
+const cfg=()=>({replyStyle:document.getElementById('duet-style')?.value||'',rootSpelling:app.rootPicker.spelling,captureMode:conversation?.active()?'ai':(app.video.container.dataset.playMode==='video'?'video':'play'),soundSlug:app.audioControls.sounds._requestedInstrument||app.options.soundSlug,scaleSlug:app.options.scaleSlug,midiRoot:app.keyboard.mapping.root,layout:app.options.features.layout,transposition:app.keyboard.mapping.transposition,volume:app.options.volume});
 function currentEvents(){const c=recorder.current();return c?c.events.concat([...c.held].map(([code,midi])=>({type:'off',code,midi,t:performance.now()-c.t0}))):[];}
 function drawLive(){const events=currentEvents();TK.drawRoll($('melody-live'),events,{pitches:pitches(events),labels:label});if(recorder.active())liveFrame=requestAnimationFrame(drawLive);}
 function storage(){ $('melody-storage').textContent=TK.storageAvailable()?'Saved in this browser · newest 60 melodies · Export for a backup':'Browser storage unavailable · kept for this visit only · Export for a backup';}
@@ -39,6 +40,7 @@ function render(){
   const button=(text,fn)=>{const b=document.createElement('button');b.type='button';b.textContent=text;b.onclick=fn;controls.append(b);return b;};
   if(replayId===take.id)button('Stop',()=>stop());
   else {button(take.kind==='conversation'?'Replay conversation':'Replay melody',()=>play(take,false));if(take.media?.id)button('With video',()=>play(take,true));}
+  {const mirror=button('Mirror ↗',()=>openPerformanceMirror(take,status));mirror.title='Open in Performance Mirror';mirror.setAttribute('aria-label','Open in Performance Mirror');}
   button('Delete',()=>{if(replayId===take.id)stop();undoSession=null;const original=TK.get(take._parentId||take.id);removed=[original||take];if(conversation.snapshot()?.id===(take._parentId||take.id))detachConversation();$('melody-undo').textContent='Undo delete';if(take._sessions>1&&original){undoSession=original;const remaining={...original,events:original.events.filter(e=>e.t<take._offset||e.t>take._end)};TK.save(remaining);}else TK.remove(take._parentId||take.id);$('melody-undo').hidden=false;});
   card.append(title,info,canvas,controls);host.append(card);requestAnimationFrame(()=>TK.drawRoll(canvas,take.events,{pitches:pitches(take.events),labels:label,duration:take.duration,barFor:(m,b)=>b.voice==='ai'?'#c48527':b.voice==='human'?'#008f98':'#b4442c'}));
  }
@@ -144,7 +146,7 @@ function init(){
    if(instrument){instrument.out.gain.value=1;conversationVoices.set(code,instrument.play(midi,undefined,{gain:(event.cfg?.volume??.5)*app.audioControls.sounds._gainBoost}));}
   }else{const n=replayCounts.get(midi)||0;if(!n)app.audioControls.noteOn(midi);replayCounts.set(midi,n+1);}
   const key=chooseReplayKey(midi,event.voice==='human'?(event.key||code):code);if(key)replayKeys.set(code||String(midi),key);
-  if(liveDuet)conversation.note('on',midi,code,'ai',cfg());replayLights();
+  if(liveDuet)conversation.note('on',midi,code,'ai',{...cfg(),...playingTake.cfg});replayLights();
  },noteOff(midi,code){
   replayKeys.delete(code||String(midi));
   if(conversationVoices.has(code)){conversationVoices.get(code).stop();conversationVoices.delete(code);}

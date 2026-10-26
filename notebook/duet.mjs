@@ -54,7 +54,7 @@ export function initDuet(app){
  const range=()=>[...new Set(Object.values(app.keyboard.buttons._buttonsByName).filter(b=>b.eventType==='midi'&&!b.disabled).map(b=>b.eventData))].sort((a,b)=>a-b);
  const roll=createVerticalRoll(find('duet-roll'),range);let replayCursor=0,replayTake=null;
  const isBacking=()=>find('duet-style').value==='accompaniment';let backingEpoch=0,backingBusy=false,backingSound='acoustic_grand_piano';
- const backing=createAccompaniment({getPitches:range,getRoot:()=>app.options.midiRoot,emit(type,midi,code,volume){roll.note(type,midi,code,'ai');window.aqNotebook.conversation.note(type,midi,code,'ai',{soundSlug:backingSound,midiRoot:app.options.midiRoot,scaleSlug:app.options.scaleSlug,layout:app.options.features.layout,volume,arrangement:'model-motif-explicit-backing'});},onBeat({beat}){find('backing-beat').textContent=String(beat%4+1);}});
+ const backing=createAccompaniment({getPitches:range,getRoot:()=>app.options.midiRoot,emit(type,midi,code,volume){roll.note(type,midi,code,'ai');window.aqNotebook.conversation.note(type,midi,code,'ai',{replyStyle:'accompaniment',soundSlug:backingSound,midiRoot:app.options.midiRoot,scaleSlug:app.options.scaleSlug,layout:app.options.features.layout,volume,arrangement:'model-motif-explicit-backing'});},onBeat({beat}){find('backing-beat').textContent=String(beat%4+1);}});
  toggleGroup('backing-texture','chords');toggleGroup('backing-progression','follow');toggleGroup('backing-density','steady');
  function updateBacking(){const tempo=Number(find('backing-tempo').value);find('backing-tempo-value').textContent=tempo+' BPM';backing.update({tempo,density:find('backing-density').value,texture:find('backing-texture').value,progression:find('backing-progression').value,volume:Number(find('backing-volume').value)});}
  ['backing-texture','backing-progression','backing-density'].forEach(id=>find(id).onchange=updateBacking);
@@ -150,7 +150,7 @@ export function initDuet(app){
     lastReply=audibleReply(take,prompt,out.sequence,allowed,style,isOpening);lastReply.modelAttempts=out.attempts;
    }
    if(isOpening){if(!lastReply.generationFallback)lastReply.title='AI opening';delete lastReply.parentTakeId;}
-   lastReply.cfg={...lastReply.cfg,soundSlug:contrastingSound()};
+   lastReply.cfg={...lastReply.cfg,replyStyle:style,soundSlug:contrastingSound()};
    TK.save(lastReply); // Keep the full generated phrase even when the user interrupts playback.
    find('duet-keep').disabled=false;
    status(lastReply.generationFallback?'The model was silent; playing a local echo instead.':'AI’s turn. Play a note whenever you want to take over.');

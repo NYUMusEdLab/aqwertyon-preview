@@ -1,6 +1,13 @@
 import {installWorkshopViewport} from './workshop-viewport.mjs';
 // UI translation only. Never rewrites input values, saved titles, musical data or URLs.
 const pairs={
+'Open in Performance Mirror':'在演奏镜中打开','Mirror ↗':'演奏镜 ↗',
+'Opening Performance Mirror…':'正在打开演奏镜……',
+'Opened in Performance Mirror. Your original remains here.':'已在演奏镜中打开，原始演奏仍保存在此处。',
+'Allow a new tab to open Performance Mirror, then try again.':'请允许打开新标签页，然后重试。',
+'Performance Mirror did not confirm import. Your original remains here; try again.':'演奏镜未确认导入，原始演奏仍保存在此处，请重试。',
+'Performance Mirror could not save this take. Your original remains here.':'演奏镜无法保存此演奏，原始演奏仍保存在此处。',
+
 'Loading sound':'正在加载音色','Retry sound':'重试音色','Sound ready — play a key.':'音色已就绪，请演奏琴键。','Sound could not load. Previous sound is still available.':'无法加载音色，仍可使用之前的音色。','Sound could not load. Retry or choose another sound.':'无法加载音色，请重试或选择其他音色。',
 'Video ready.':'视频已就绪。','Loading video':'正在加载视频','Retry video':'重试视频','Loading video metadata…':'正在加载视频信息……','Buffering video…':'正在缓冲视频……','Video ready — press Play.':'视频已就绪，请按播放。','Video paused — press Play to continue.':'视频已暂停，请按播放继续。',
 'Follow melody':'跟随旋律','AI supplies a motif. Chords are arranged locally; Follow melody fits recent notes at each bar.':'AI 提供动机；和弦由本地规则编配。“跟随旋律”在每小节根据最近演奏的音符选择和弦。','Done':'完成','Video':'视频','AI duet':'AI 合奏',
